@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Volatility Surface Lab: option pricing, arbitrage-controlled volatility surfaces, Heston calibration and hedging model risk"
+authors:
+  - family-names: Farajov
+    given-names: Elmar
+version: 1.0.0
+date-released: 2026-09-17
+license: MIT
+repository-code: "https://github.com/elmarfarajov/volatility-surface-lab"
+keywords:
+  - implied volatility
+  - Heston model
+  - SVI
+  - local volatility
+  - option pricing
+  - delta hedging
