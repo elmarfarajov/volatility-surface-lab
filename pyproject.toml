@@ -56,7 +56,7 @@ ignore = ["E731"]
 # strict for the packages rebuilt day by day; the original modules join as they are revisited
 python_version = "3.10"
 strict = true
-files = ["src/volsurf/analytic"]
+files = ["src/volsurf/analytic", "src/volsurf/gallery"]
 
 [[tool.mypy.overrides]]
 # SciPy ships no type information; its stubs package breaks mypy on Python 3.10
