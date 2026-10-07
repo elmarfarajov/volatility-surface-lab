@@ -4,8 +4,8 @@ title: "Volatility Surface Lab: option pricing, arbitrage-controlled volatility 
 authors:
   - family-names: Farajov
     given-names: Elmar
-version: 1.0.0
-date-released: 2026-09-17
+version: 1.1.0
+date-released: 2026-10-07
 license: MIT
 repository-code: "https://github.com/elmarfarajov/volatility-surface-lab"
 keywords:

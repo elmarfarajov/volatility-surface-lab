@@ -4,6 +4,9 @@
 ![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)
 ![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
+[![Release](https://img.shields.io/badge/release-v1.1.0-e0632b)](https://github.com/elmarfarajov/volatility-surface-lab/releases)
+![mypy](https://img.shields.io/badge/mypy-strict-1b9e77)
+![Validated](https://img.shields.io/badge/validated-QuantLib%20%7C%20mpmath%20%7C%20Haug-2f6fdb)
 
 **From raw option quotes to an arbitrage-controlled volatility surface, a calibrated stochastic-volatility
 model, and a measurement of how much risk a delta hedge actually removes.**
@@ -17,6 +20,45 @@ against published reference values.
 ![S&P 500 implied volatility surface](docs/images/vol_surface_3d.png)
 
 ---
+
+## Being built out, day by day
+
+The lab is being rebuilt and deepened over nine days, one area of the stack a day. Each
+day holds its area to references it shares no code with: published worked examples,
+QuantLib, arbitrary-precision arithmetic, real market data, or properties that must
+hold for any input. The plan and each day's results are in the [roadmap](docs/ROADMAP.md),
+the charts in the [gallery](docs/GALLERY.md), and the decisions in the
+[architecture decision records](docs/adr/README.md).
+
+| Day | Area | Status |
+|---|---|---|
+| 1 | The analytic foundation: one model for every underlying, seventeen Greeks, three references | ✅ v1.1.0 |
+| 2 | Numerical engines: lattices, finite differences, Monte Carlo | next |
+| 3 | Implied volatility and real option chains | |
+| 4 | The arbitrage-free surface: SVI, SSVI, densities | |
+| 5 | Heston: Fourier pricing, calibration, simulation | |
+| 6 | Local volatility and SABR | |
+| 7 | Exotic options | |
+| 8 | Hedging and model risk | |
+| 9 | The platform | |
+
+**Day 1: the analytic foundation.**
+
+- **One model for every underlying.** Generalised Black-Scholes-Merton prices options on
+  stocks, indices, futures, currencies and margined futures through the cost of carry.
+- **Seventeen Greeks to third order**, each checked three ways:
+  - against the price differentiated to 50 digits with mpmath, agreeing to 1e-14;
+  - against QuantLib on 500 random contracts;
+  - against Haug's (2007) worked examples, reproduced to the printed digit.
+
+The arbitrary-precision reference caught two Greeks, veta and color, with their signs
+turned: as usually printed, they are derivatives in time to expiry rather than in time
+passing. At expiry the Greeks are now their limits, where the original code divided by
+zero.
+
+![Every Greek against an independent reference](docs/images/greek-references.png)
+
+The full account is in [the analytic foundation](docs/notes/the-analytic-foundation.md).
 
 ## Results on live S&P 500 options
 
@@ -98,7 +140,8 @@ flowchart LR
 
 | Module | Contents |
 |---|---|
-| `black_scholes.py` | Black-76 and Black-Scholes-Merton prices; delta, gamma, vega, theta, rho, vanna, volga |
+| `analytic/` | Generalised Black-Scholes-Merton for every carry convention; seventeen Greeks to third order with limits at expiry; Merton's bounds and strike conditions; an arbitrary-precision reference and Haug's published examples |
+| `black_scholes.py` | Black-76 core in the forward, used throughout; its Greeks now come from `analytic/` |
 | `implied_vol.py` | Vectorised, bracket-safeguarded Newton inversion started at the price-volatility inflection point |
 | `lattice.py` | Leisen-Reimer and Cox-Ross-Rubinstein trees, European and American exercise |
 | `monte_carlo.py` | GBM with antithetic sampling and control variates; Heston QE scheme with martingale correction; Longstaff-Schwartz |
@@ -108,8 +151,9 @@ flowchart LR
 | `surface.py` | Monotone total-variance interpolation, Dupire local volatility, calendar diagnostics |
 | `calibration.py` | Vega-scaled least squares, market-informed multistart or differential evolution, exact-IV residual reporting |
 | `hedging.py` | Discrete delta-hedging P&L in Black-Scholes and Heston worlds for three hedge ratios |
-| `validation.py` | 16 checks against published benchmarks and independent methods |
+| `validation.py` | 19 checks against published benchmarks and independent methods |
 | `report.py`, `figures.py` | Self-contained HTML report with an interactive 3D surface; publication-style figures |
+| `gallery/` | The documentation's charts, registered by day and redrawn with `volsurf gallery` |
 | `app/streamlit_app.py` | Interactive dashboard: pricing lab, surface explorer, calibration and hedging lab |
 
 ## Engineering decisions worth noting

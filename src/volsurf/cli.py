@@ -121,6 +121,32 @@ def cmd_price(args: argparse.Namespace) -> None:
         print(f"{name:<{width}}  {price:>12.6f}{extra}")
 
 
+def cmd_greeks(args: argparse.Namespace) -> None:
+    from .analytic import Carry, greeks
+
+    carry = {
+        "stock": Carry.stock(args.rate, args.dividend),
+        "future": Carry.future(args.rate),
+        "currency": Carry.currency(args.rate, args.dividend),
+    }[args.underlying]
+    g = greeks(args.spot, args.strike, args.maturity, carry.rate, carry.yield_, args.vol, args.type == "call")
+    print(f"{carry.convention} {args.type}: S={args.spot} K={args.strike} T={args.maturity} r={carry.rate} q={carry.yield_}")
+    for name, value in g.as_dict().items():
+        print(f"  {name:<11} {float(value): .10f}")
+
+
+def cmd_gallery(args: argparse.Namespace) -> None:
+    from pathlib import Path
+
+    from . import gallery
+
+    written = gallery.build(args.out, only=args.only)
+    Path("docs").mkdir(exist_ok=True)
+    if args.only is None:
+        Path("docs/GALLERY.md").write_text(gallery.markdown(), encoding="utf-8")
+    print(f"{len(written)} charts written to {args.out}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="volsurf", description="Option pricing, volatility surfaces and Heston calibration.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -159,6 +185,22 @@ def build_parser() -> argparse.ArgumentParser:
     price.add_argument("--type", choices=["call", "put"], default="call")
     price.add_argument("--heston", default=None, help="v0,kappa,theta,sigma,rho")
     price.set_defaults(func=cmd_price)
+
+    greek = sub.add_parser("greeks", help="the price and seventeen Greeks of a European option")
+    greek.add_argument("--spot", type=float, required=True)
+    greek.add_argument("--strike", type=float, required=True)
+    greek.add_argument("--maturity", type=float, required=True)
+    greek.add_argument("--rate", type=float, default=0.0)
+    greek.add_argument("--dividend", type=float, default=0.0, help="dividend yield, or the foreign rate for a currency")
+    greek.add_argument("--vol", type=float, required=True)
+    greek.add_argument("--type", choices=["call", "put"], default="call")
+    greek.add_argument("--underlying", choices=["stock", "future", "currency"], default="stock")
+    greek.set_defaults(func=cmd_greeks)
+
+    charts = sub.add_parser("gallery", help="redraw the documentation's charts")
+    charts.add_argument("--out", default="docs/images")
+    charts.add_argument("--only", default=None, help="one chart's file name, or a day's number")
+    charts.set_defaults(func=cmd_gallery)
     return parser
 
 

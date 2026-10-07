@@ -97,28 +97,13 @@ def bsm_greeks(
     vol: ArrayLike,
     is_call: ArrayLike = True,
 ) -> Greeks:
-    spot, strike, maturity, rate, q, vol = _as_float_arrays(spot, strike, maturity, rate, dividend_yield, vol)
-    is_call = np.broadcast_to(np.asarray(is_call, dtype=bool), spot.shape)
+    """The first- and second-order Greeks the hedging laboratory uses, from :mod:`volsurf.analytic`.
 
-    sqrt_t = np.sqrt(maturity)
-    total_vol = vol * sqrt_t
-    d1 = (np.log(spot / strike) + (rate - q + 0.5 * vol**2) * maturity) / total_vol
-    d2 = d1 - total_vol
-    df_r = np.exp(-rate * maturity)
-    df_q = np.exp(-q * maturity)
-    pdf_d1 = norm_pdf(d1)
+    The full set - seventeen Greeks to third order, with their limits at expiry and at
+    zero volatility, where this function used to divide by zero - is
+    :func:`volsurf.analytic.greeks`.
+    """
+    from .analytic import greeks
 
-    price = bsm_price(spot, strike, maturity, rate, q, vol, is_call)
-    delta = np.where(is_call, df_q * ndtr(d1), df_q * (ndtr(d1) - 1.0))
-    gamma = df_q * pdf_d1 / (spot * total_vol)
-    vega = spot * df_q * pdf_d1 * sqrt_t
-    decay = -spot * df_q * pdf_d1 * vol / (2.0 * sqrt_t)
-    theta = np.where(
-        is_call,
-        decay - rate * strike * df_r * ndtr(d2) + q * spot * df_q * ndtr(d1),
-        decay + rate * strike * df_r * ndtr(-d2) - q * spot * df_q * ndtr(-d1),
-    )
-    rho = np.where(is_call, strike * maturity * df_r * ndtr(d2), -strike * maturity * df_r * ndtr(-d2))
-    vanna = -df_q * pdf_d1 * d2 / vol
-    volga = vega * d1 * d2 / vol
-    return Greeks(price, delta, gamma, vega, theta, rho, vanna, volga)
+    g = greeks(spot, strike, maturity, rate, dividend_yield, vol, is_call)
+    return Greeks(g.price, g.delta, g.gamma, g.vega, g.theta, g.rho, g.vanna, g.volga)
