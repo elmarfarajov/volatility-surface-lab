@@ -264,6 +264,54 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
             worst < 0.1,
         )
 
+    def haug():
+        from .analytic import greeks
+        from .analytic.published import HAUG_2007
+
+        misses = [
+            e.title
+            for e in HAUG_2007
+            if round(float(getattr(greeks(e.spot, e.strike, e.maturity, e.rate, e.yield_, e.vol, e.is_call), e.quantity)), 4)
+            != e.published
+        ]
+        return (
+            f"{len(HAUG_2007)} worked examples (Haug 2007)",
+            f"{len(HAUG_2007) - len(misses)} reproduced",
+            ", ".join(misses) or "none",
+            not misses,
+        )
+
+    def mpmath_greeks():
+        from .analytic import greeks
+        from .analytic.reference import DEFINITIONS, reference_greeks
+
+        rng = np.random.default_rng(5)
+        worst = 0.0
+        for _ in range(4 if fast else 12):
+            contract = (*rng.uniform([50, 50, 0.05, -0.02, 0.0, 0.08], [150, 150, 3, 0.1, 0.06, 0.8]), bool(rng.random() < 0.5))
+            ours, ref = greeks(*contract).as_dict(), reference_greeks(*contract)
+            worst = max(worst, max(abs(float(ours[n]) - ref[n]) / max(abs(ref[n]), 1e-12) for n in DEFINITIONS))
+        return "mpmath, 50 digits", f"{len(DEFINITIONS)} Greeks to third order", f"{worst:.1e}", worst < 1e-11
+
+    def pde():
+        from .analytic import greeks
+
+        rng = np.random.default_rng(6)
+        s, k = rng.uniform(5, 500, 20_000), rng.uniform(5, 500, 20_000)
+        t, r, q, v = (
+            rng.uniform(0.01, 10, 20_000),
+            rng.uniform(-0.03, 0.15, 20_000),
+            rng.uniform(-0.02, 0.1, 20_000),
+            rng.uniform(0.02, 2, 20_000),
+        )
+        g = greeks(s, k, t, r, q, v, True)
+        terms = np.stack([g.theta, (r - q) * s * g.delta, 0.5 * v**2 * s**2 * g.gamma, -r * g.price])
+        worst = float(np.max(np.abs(terms.sum(axis=0)) / np.maximum(np.abs(terms).max(axis=0), 1e-300)))
+        return "dV/dt + (r-q)S V_S + sigma^2 S^2 V_SS / 2 - rV = 0", "20,000 random contracts", f"{worst:.1e}", worst < 1e-10
+
+    add("Analytic", "Published examples", haug)
+    add("Analytic", "Seventeen Greeks vs arbitrary precision", mpmath_greeks)
+    add("Analytic", "Black-Scholes PDE from the Greeks", pde)
     add("Black-Scholes", "Call price", bs_hull)
     add("Black-Scholes", "Put-call parity, 5,000 random contracts", parity)
     add("Black-Scholes", "Analytic Greeks", greeks_fd)
