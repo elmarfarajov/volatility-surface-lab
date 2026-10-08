@@ -112,21 +112,95 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
         )
 
     def american_tree():
+        # the reference used to be Longstaff-Schwartz's 4.478, which is the Bermudan price (numerics.references)
         value = binomial_price(36, 40, 1, 0.06, 0, 0.2, False, True, steps=2001)
+        reference = 4.486674
         return (
-            "4.478 (finite difference, Longstaff-Schwartz 2001)",
+            f"{reference} (Andersen-Lake-Offengenden 2016)",
             f"{value:.4f}",
-            f"{abs(value - 4.478):.1e}",
-            abs(value - 4.478) < 0.01,
+            f"{abs(value - reference):.1e}",
+            abs(value - reference) < 1e-3,
         )
 
     def lsm():
+        # 50 exercise dates a year: a Bermudan option, whose price is 4.4778 (Crank-Nicolson, numerics.references)
         res = lsm_american_price(36, 40, 1, 0.06, 0, 0.2, False, 50, 50_000 if fast else 200_000, seed=11)
+        reference = 4.477792
         return (
-            "4.472 +- 0.010 (Longstaff-Schwartz 2001)",
+            f"{reference} (Bermudan, 50 dates)",
             f"{res.price:.4f} +- {res.std_error:.4f}",
-            f"{abs(res.price - 4.472):.1e}",
-            abs(res.price - 4.472) < 0.04,
+            f"{abs(res.price - reference):.1e}",
+            abs(res.price - reference) < 4 * res.std_error + 0.005,
+        )
+
+    def bbsr_reference():
+        from .numerics.lattice import Contract, bbsr
+        from .numerics.references import LONGSTAFF_SCHWARTZ_TABLE
+
+        rows = LONGSTAFF_SCHWARTZ_TABLE[::4] if fast else LONGSTAFF_SCHWARTZ_TABLE
+        worst = max(
+            abs(bbsr(Contract(r.spot, r.strike, r.maturity, r.rate, 0.0, r.vol, False), 1000, "crr") - r.american) for r in rows
+        )
+        return f"{len(rows)} American puts, Andersen-Lake-Offengenden", "BBSR, 1,000 / 2,000 steps", f"{worst:.1e}", worst < 2e-4
+
+    def crank_nicolson_american():
+        from .numerics.lattice import Contract
+        from .numerics.pde import solve
+
+        r0 = 4.486674
+        value = solve(Contract(36.0, 40.0, 1.0, 0.06, 0.0, 0.2, False), 1600, 1600, exercise="american").price
+        return (
+            f"{r0} (Andersen-Lake-Offengenden)",
+            "Crank-Nicolson + Rannacher, 1,600 x 1,600",
+            f"{abs(value - r0):.1e}",
+            abs(value - r0) < 5e-4,
+        )
+
+    def longstaff_schwartz_table():
+        from .numerics.references import LONGSTAFF_SCHWARTZ_TABLE
+
+        bermudan = sum(abs(r.longstaff_schwartz - r.bermudan_50) < 5e-4 for r in LONGSTAFF_SCHWARTZ_TABLE)
+        american = sum(abs(r.longstaff_schwartz - r.american) < 5e-4 for r in LONGSTAFF_SCHWARTZ_TABLE)
+        return (
+            "Longstaff-Schwartz (2001) Table 1, finite differences",
+            f"{bermudan}/20 match the Bermudan price, {american}/20 the American",
+            "a Bermudan column",
+            bermudan >= 15,
+        )
+
+    def lsm_bounds():
+        from .numerics.lattice import Contract
+        from .numerics.montecarlo import longstaff_schwartz
+
+        res = longstaff_schwartz(
+            Contract(36.0, 40.0, 1.0, 0.06, 0.0, 0.2, False),
+            [k / 50 for k in range(1, 51)],
+            40_000 if fast else 100_000,
+            40_000 if fast else 100_000,
+            dual_paths=1_000 if fast else 4_000,
+            inner_paths=100 if fast else 200,
+            seed=3,
+        )
+        truth = 4.477792
+        inside = res.lower.price - 3 * res.lower.std_error <= truth <= res.upper.price + 3 * res.upper.std_error
+        return (
+            f"{truth} (Bermudan, 50 dates)",
+            f"[{res.lower.price:.4f}, {res.upper.price:.4f}]",
+            f"gap {res.gap:.4f}",
+            inside and res.gap < 0.02,
+        )
+
+    def sobol():
+        from .numerics.lattice import Contract
+        from .numerics.montecarlo import european
+
+        c = Contract(100.0, 105.0, 1.0, 0.05, 0.02, 0.25, True)
+        pseudo, quasi = european(c, 2**18, "pseudo", seed=1), european(c, 2**18, "sobol", seed=1)
+        return (
+            "Black-Scholes",
+            f"std error {quasi.std_error:.1e} vs {pseudo.std_error:.1e}",
+            f"{(pseudo.std_error / quasi.std_error) ** 2:.0f}x fewer samples",
+            abs(quasi.price - c.european()) < 4 * quasi.std_error,
         )
 
     def cos_reference():
@@ -318,7 +392,12 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
     add("Implied vol", "Round trip, safeguarded Newton", iv_roundtrip)
     add("Lattice", "Leisen-Reimer vs CRR convergence", lr_tree)
     add("Lattice", "American put S=36, K=40", american_tree)
-    add("Monte Carlo", "Longstaff-Schwartz American put", lsm)
+    add("Lattice", "BBSR on the American references", bbsr_reference)
+    add("Finite differences", "American put, Crank-Nicolson", crank_nicolson_american)
+    add("References", "What Longstaff-Schwartz's column is", longstaff_schwartz_table)
+    add("Monte Carlo", "Longstaff-Schwartz, in-sample (Bermudan)", lsm)
+    add("Monte Carlo", "Lower and dual upper bound", lsm_bounds)
+    add("Monte Carlo", "Scrambled Sobol' vs pseudo-random", sobol)
     add("Monte Carlo", "Control variate on GBM", cv_efficiency)
     add("Heston", "COS method reference price", cos_reference)
     add("Heston", "Gil-Pelaez reference price", integration_reference)
