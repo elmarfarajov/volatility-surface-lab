@@ -27,3 +27,29 @@ Every chart is rebuilt from source with `volsurf gallery`. The figures of the li
 **The Greeks at expiry** - Price, delta and theta reaching their limits as time to expiry falls to zero.
 
 ![The Greeks at expiry](images/expiry-limits.png)
+
+## Day 2: Numerical engines
+
+**How fast each lattice converges** - Five lattices and BBSR against the exact price, European and American.
+
+![How fast each lattice converges](images/lattice-convergence.png)
+
+**Longstaff and Schwartz's 'American' prices are Bermudan prices** - Their Table 1 against the American and the fifty-date Bermudan put.
+
+![Longstaff and Schwartz's 'American' prices are Bermudan prices](images/longstaff-schwartz-table.png)
+
+**Crank-Nicolson rings at the strike** - Gamma from the finite-difference grid, with and without Rannacher's start.
+
+![Crank-Nicolson rings at the strike](images/rannacher.png)
+
+**Where an American put should be exercised** - The early-exercise boundary through the option's life, and today's value.
+
+![Where an American put should be exercised](images/exercise-boundary.png)
+
+**Monte Carlo error against the number of samples** - Pseudo-random, antithetic, control-variate and scrambled Sobol' sampling.
+
+![Monte Carlo error against the number of samples](images/monte-carlo-convergence.png)
+
+**Least-squares Monte Carlo, bracketed from both sides** - The out-of-sample lower bound and the dual upper bound around the Bermudan value.
+
+![Least-squares Monte Carlo, bracketed from both sides](images/early-exercise-bounds.png)

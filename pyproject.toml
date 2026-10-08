@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "volsurf"
-version = "1.1.0"
+version = "1.2.0"
 description = "Option pricing, arbitrage-free volatility surfaces, Heston calibration and a delta-hedging model-risk lab."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -56,7 +56,7 @@ ignore = ["E731"]
 # strict for the packages rebuilt day by day; the original modules join as they are revisited
 python_version = "3.10"
 strict = true
-files = ["src/volsurf/analytic", "src/volsurf/gallery"]
+files = ["src/volsurf/analytic", "src/volsurf/gallery", "src/volsurf/numerics"]
 
 [[tool.mypy.overrides]]
 # SciPy ships no type information; its stubs package breaks mypy on Python 3.10

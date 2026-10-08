@@ -14,8 +14,8 @@ real market data, or properties that must hold for any input.
 | Day | Area | Issue | Release | Status |
 |---|---|---|---|---|
 | 1 | The analytic foundation: generalised Black-Scholes-Merton, seventeen Greeks, independent references | #1 | v1.1.0 | ✅ Done |
-| 2 | Numerical engines: lattices, finite differences and Monte Carlo against high-precision references | #2 | v1.2.0 | Next |
-| 3 | Implied volatility and the market: robust inversion, forward extraction, real option chains | #3 | v1.3.0 | |
+| 2 | Numerical engines: lattices, finite differences and Monte Carlo against high-precision references | #2 | v1.2.0 | ✅ Done |
+| 3 | Implied volatility and the market: robust inversion, forward extraction, real option chains | #3 | v1.3.0 | Next |
 | 4 | The arbitrage-free surface: SVI and SSVI, calendar and butterfly conditions, wings and densities | #4 | v1.4.0 | |
 | 5 | Heston: characteristic functions, Fourier pricing, calibration and simulation | #5 | v1.5.0 | |
 | 6 | Local volatility and SABR: Dupire in implied-volatility form, Hagan and its corrections | #6 | v1.6.0 | |
@@ -49,3 +49,23 @@ real market data, or properties that must hold for any input.
   - a generated chart gallery with six charts.
 
 **Notes:** [the analytic foundation](notes/the-analytic-foundation.md).
+
+## Day 2 - numerical engines ✅
+
+**Issue #2, release v1.2.0.**
+
+- **Five lattices.** CRR, Jarrow-Rudd, Tian, Leisen-Reimer and trinomial trees, with
+  European, Bermudan and American exercise, BBS smoothing and Richardson extrapolation.
+  Tian and Leisen-Reimer are QuantLib's trees to 1e-11.
+- **Finite differences.** Crank-Nicolson with Rannacher smoothing, which cuts the gamma
+  error near the strike from 0.85 to 1.5e-5. Early exercise by projection, and the
+  exercise boundary, which matches its near-expiry asymptote.
+- **Monte Carlo with honest errors.** Randomised scrambled Sobol', about 25,000 times
+  less variance than pseudo-random at 2^18 samples. Least-squares Monte Carlo bracketed
+  by an out-of-sample lower bound and a dual upper bound, 0.003 apart.
+- **The references corrected.** Longstaff and Schwartz's (2001) widely quoted American
+  column agrees, in 15 of 20 cases, with a Bermudan put exercisable fifty times a year,
+  not with the American put. American references are now Andersen, Lake and
+  Offengenden's (2016) high-precision values.
+
+**Notes:** [numerical engines](notes/numerical-engines.md).
