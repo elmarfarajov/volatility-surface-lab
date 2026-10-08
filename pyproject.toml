@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "volsurf"
-version = "1.1.0"
+version = "1.2.0"
 description = "Option pricing, arbitrage-free volatility surfaces, Heston calibration and a delta-hedging model-risk lab."
 readme = "README.md"
 requires-python = ">=3.10"
