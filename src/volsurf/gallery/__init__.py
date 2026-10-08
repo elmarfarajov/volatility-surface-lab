@@ -87,7 +87,14 @@ def build(out_dir: str | Path = "docs/images", only: str | None = None) -> list[
 
 def markdown(prefix: str = "images") -> str:
     """The gallery page, generated, so it always lists exactly the charts there are."""
-    lines = ["# Gallery", "", "Every chart is rebuilt from source with `volsurf gallery`.", ""]
+    lines = [
+        "# Gallery",
+        "",
+        "Every chart is rebuilt from source with `volsurf gallery`. The figures of the live S&P 500 analysis "
+        "(the surface, the smiles, the Heston fit, the hedging laboratory) come from `volsurf analyze` and are shown "
+        "in the README.",
+        "",
+    ]
     for day, title in DAYS.items():
         lines += [f"## Day {day}: {title}", ""]
         for item in items():
