@@ -13,10 +13,10 @@ from pathlib import Path
 
 from matplotlib.figure import Figure
 
-from . import analytic
+from . import analytic, numerics
 from .style import save
 
-DAYS: dict[int, str] = {1: "The analytic foundation"}
+DAYS: dict[int, str] = {1: "The analytic foundation", 2: "Numerical engines"}
 
 
 @dataclass(frozen=True)
@@ -71,6 +71,48 @@ def items() -> tuple[Item, ...]:
             "Price, delta and theta reaching their limits as time to expiry falls to zero.",
             analytic.expiry_limits,
             1,
+        ),
+        Item(
+            "lattice-convergence.png",
+            "How fast each lattice converges",
+            "Five lattices and BBSR against the exact price, European and American.",
+            numerics.lattice_convergence,
+            2,
+        ),
+        Item(
+            "longstaff-schwartz-table.png",
+            "Longstaff and Schwartz's 'American' prices are Bermudan prices",
+            "Their Table 1 against the American and the fifty-date Bermudan put.",
+            numerics.longstaff_schwartz_table,
+            2,
+        ),
+        Item(
+            "rannacher.png",
+            "Crank-Nicolson rings at the strike",
+            "Gamma from the finite-difference grid, with and without Rannacher's start.",
+            numerics.rannacher,
+            2,
+        ),
+        Item(
+            "exercise-boundary.png",
+            "Where an American put should be exercised",
+            "The early-exercise boundary through the option's life, and today's value.",
+            numerics.exercise_boundary,
+            2,
+        ),
+        Item(
+            "monte-carlo-convergence.png",
+            "Monte Carlo error against the number of samples",
+            "Pseudo-random, antithetic, control-variate and scrambled Sobol' sampling.",
+            numerics.monte_carlo_convergence,
+            2,
+        ),
+        Item(
+            "early-exercise-bounds.png",
+            "Least-squares Monte Carlo, bracketed from both sides",
+            "The out-of-sample lower bound and the dual upper bound around the Bermudan value.",
+            numerics.early_exercise_bounds,
+            2,
         ),
     )
 
