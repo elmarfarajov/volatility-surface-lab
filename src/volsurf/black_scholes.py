@@ -12,7 +12,8 @@ from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import ArrayLike
-from scipy.special import ndtr
+
+from .market.black import black_price
 
 _SQRT_2PI = np.sqrt(2.0 * np.pi)
 
@@ -34,22 +35,13 @@ def black76_price(
     vol: ArrayLike,
     is_call: ArrayLike = True,
 ) -> np.ndarray:
-    """Discounted Black-76 price. Calls and puts are both computed directly (no parity
-    subtraction), which keeps deep out-of-the-money prices accurate to machine precision."""
-    forward, strike, maturity, discount, vol = _as_float_arrays(forward, strike, maturity, discount, vol)
-    is_call = np.broadcast_to(np.asarray(is_call, dtype=bool), forward.shape)
+    """Discounted Black-76 price, from :func:`volsurf.market.black.black_price`.
 
-    total_vol = vol * np.sqrt(maturity)
-    positive = total_vol > 0
-    safe_total_vol = np.where(positive, total_vol, 1.0)
-    d1 = np.log(forward / strike) / safe_total_vol + 0.5 * safe_total_vol
-    d2 = d1 - safe_total_vol
-
-    call = forward * ndtr(d1) - strike * ndtr(d2)
-    put = strike * ndtr(-d2) - forward * ndtr(-d1)
-    undiscounted = np.where(is_call, call, put)
-    intrinsic = np.where(is_call, np.maximum(forward - strike, 0.0), np.maximum(strike - forward, 0.0))
-    return discount * np.where(positive, undiscounted, intrinsic)
+    The literal ``F N(d1) - K N(d2)`` this function used to evaluate cancels out of the
+    money at small total volatility (both terms nearly equal) and was wrong in the
+    ninth digit or worse there; the Mills-ratio form is accurate to rounding everywhere.
+    """
+    return black_price(forward, strike, maturity, vol, discount, is_call)
 
 
 def bsm_price(
