@@ -87,3 +87,33 @@ Every chart is rebuilt from source with `volsurf gallery`. The figures of the li
 **Yahoo Finance's implied volatilities assume zero rates** - The vendor's figures against parity forwards, and the assumption that reproduces them.
 
 ![Yahoo Finance's implied volatilities assume zero rates](images/vendor-iv.png)
+
+## Day 4: The arbitrage-free surface
+
+**A smile that fits and still admits arbitrage** - Axel Vogt's SVI slice: its negative density, and a refit under hard constraints.
+
+![A smile that fits and still admits arbitrage](images/vogt-slice.png)
+
+**The original surface had arbitrage** - The v1.0 fit checked on the whole line: negative densities, crossing slices, and between expiries.
+
+![The original surface had arbitrage](images/v1-arbitrage.png)
+
+**Fitting the S&P 500 smile without arbitrage** - v1.0 SVI, eSSVI and constrained SVI against bid-ask bands, a week to two years.
+
+![Fitting the S&P 500 smile without arbitrage](images/smile-fits.png)
+
+**What the no-arbitrage conditions cost in fit** - Error and share inside the spread for SSVI, eSSVI, v1.0 and constrained SVI.
+
+![What the no-arbitrage conditions cost in fit](images/fit-quality.png)
+
+**The distributions the S&P 500 options price** - Risk-neutral densities with their mass, mean and Breeden-Litzenberger checks.
+
+![The distributions the S&P 500 options price](images/risk-neutral-densities.png)
+
+**Between expiries: interpolate prices, not variances** - Total variance through time, and the worst density of every intermediate smile.
+
+![Between expiries: interpolate prices, not variances](images/time-interpolation.png)
+
+**What the wings say about the moments** - Wing slopes against Lee's bound, and the moments of the index they imply.
+
+![What the wings say about the moments](images/lee-wings.png)

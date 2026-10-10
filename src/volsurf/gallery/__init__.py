@@ -13,10 +13,15 @@ from pathlib import Path
 
 from matplotlib.figure import Figure
 
-from . import analytic, market, numerics
+from . import analytic, market, numerics, smiles
 from .style import save
 
-DAYS: dict[int, str] = {1: "The analytic foundation", 2: "Numerical engines", 3: "Implied volatility and the market"}
+DAYS: dict[int, str] = {
+    1: "The analytic foundation",
+    2: "Numerical engines",
+    3: "Implied volatility and the market",
+    4: "The arbitrage-free surface",
+}
 
 
 @dataclass(frozen=True)
@@ -177,6 +182,61 @@ def items() -> tuple[Item, ...]:
             "The vendor's figures against parity forwards, and the assumption that reproduces them.",
             market.vendor_iv,
             3,
+            "snapshot",
+        ),
+        Item(
+            "vogt-slice.png",
+            "A smile that fits and still admits arbitrage",
+            "Axel Vogt's SVI slice: its negative density, and a refit under hard constraints.",
+            smiles.vogt_slice,
+            4,
+        ),
+        Item(
+            "v1-arbitrage.png",
+            "The original surface had arbitrage",
+            "The v1.0 fit checked on the whole line: negative densities, crossing slices, and between expiries.",
+            smiles.v1_arbitrage,
+            4,
+            "snapshot",
+        ),
+        Item(
+            "smile-fits.png",
+            "Fitting the S&P 500 smile without arbitrage",
+            "v1.0 SVI, eSSVI and constrained SVI against bid-ask bands, a week to two years.",
+            smiles.smile_fits,
+            4,
+            "snapshot",
+        ),
+        Item(
+            "fit-quality.png",
+            "What the no-arbitrage conditions cost in fit",
+            "Error and share inside the spread for SSVI, eSSVI, v1.0 and constrained SVI.",
+            smiles.fit_quality,
+            4,
+            "snapshot",
+        ),
+        Item(
+            "risk-neutral-densities.png",
+            "The distributions the S&P 500 options price",
+            "Risk-neutral densities with their mass, mean and Breeden-Litzenberger checks.",
+            smiles.densities,
+            4,
+            "snapshot",
+        ),
+        Item(
+            "time-interpolation.png",
+            "Between expiries: interpolate prices, not variances",
+            "Total variance through time, and the worst density of every intermediate smile.",
+            smiles.time_interpolation,
+            4,
+            "snapshot",
+        ),
+        Item(
+            "lee-wings.png",
+            "What the wings say about the moments",
+            "Wing slopes against Lee's bound, and the moments of the index they imply.",
+            smiles.lee_wings,
+            4,
             "snapshot",
         ),
     )
