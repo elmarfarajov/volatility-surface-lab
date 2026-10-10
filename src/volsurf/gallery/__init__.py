@@ -13,10 +13,10 @@ from pathlib import Path
 
 from matplotlib.figure import Figure
 
-from . import analytic, numerics
+from . import analytic, market, numerics
 from .style import save
 
-DAYS: dict[int, str] = {1: "The analytic foundation", 2: "Numerical engines"}
+DAYS: dict[int, str] = {1: "The analytic foundation", 2: "Numerical engines", 3: "Implied volatility and the market"}
 
 
 @dataclass(frozen=True)
@@ -26,6 +26,10 @@ class Item:
     description: str
     build: Callable[[], Figure]
     day: int
+    requires: str | None = None  # "snapshot": drawn from a local option-chain snapshot (``volsurf chains fetch``)
+
+    def available(self) -> bool:
+        return self.requires is None or market.snapshot_available()
 
 
 def items() -> tuple[Item, ...]:
@@ -114,6 +118,67 @@ def items() -> tuple[Item, ...]:
             numerics.early_exercise_bounds,
             2,
         ),
+        Item(
+            "black-cancellation.png",
+            "The textbook Black formula cancels in the wings",
+            "Out-of-the-money prices against 60-digit arithmetic: the literal formula and the Mills-ratio form.",
+            market.black_cancellation,
+            3,
+        ),
+        Item(
+            "iv-accuracy.png",
+            "Implied volatility to the last digit",
+            "The v1.0 Newton inversion and the Jaeckel-style one, against exact prices from 1e-300 to the forward.",
+            market.iv_accuracy,
+            3,
+        ),
+        Item(
+            "inversion-iterations.png",
+            "How many steps the inversion takes",
+            "Householder iterations over strike and volatility, and their distribution over random quotes.",
+            market.inversion_iterations,
+            3,
+        ),
+        Item(
+            "parity-forward.png",
+            "Forwards and discount factors from put-call parity",
+            "S&P 500 options: the synthetic forward, its residuals, the implied rate curve and dividend yield.",
+            market.parity_forward,
+            3,
+            "snapshot",
+        ),
+        Item(
+            "american-parity.png",
+            "Parity is an equality for European options only",
+            "SPX against SPY and Apple: early exercise bends the synthetic forward.",
+            market.american_parity,
+            3,
+            "snapshot",
+        ),
+        Item(
+            "cleaning-funnel.png",
+            "From a raw chain to clean quotes",
+            "What each cleaning rule removes, and the largest executable arbitrage in the chain.",
+            market.cleaning_funnel,
+            3,
+            "snapshot",
+        ),
+        Item(
+            "market-smiles.png",
+            "The S&P 500 smile across the term structure",
+            "Bid, mid and ask implied volatility from a week to two years, with the vendor's figures.",
+            market.market_smiles,
+            3,
+            "snapshot",
+        ),
+        Item(
+            "vendor-iv.png",
+            "Yahoo Finance's implied volatilities assume zero rates",
+            "The vendor's figures against parity forwards, and the assumption that reproduces them.",
+            market.vendor_iv,
+            3,
+            "snapshot",
+        ),
     )
 
 
@@ -122,6 +187,9 @@ def build(out_dir: str | Path = "docs/images", only: str | None = None) -> list[
     written = []
     for item in items():
         if only and only not in (item.filename, str(item.day)):
+            continue
+        if not item.available():
+            print(f"skipped {item.filename}: needs a local option-chain snapshot (volsurf chains fetch ^SPX SPY AAPL)")
             continue
         written.append(save(item.build(), Path(out_dir) / item.filename))
     return written
