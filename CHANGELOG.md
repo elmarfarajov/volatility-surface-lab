@@ -4,6 +4,57 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-10-10
+
+Day 3: implied volatility and the market. The Black function and its inverse are now
+exact in the far tails, and real option chains are snapshotted and cleaned with a stated
+reason for every quote dropped.
+
+### Added
+
+- **`volsurf.market.black`**: the normalised Black function through the Mills ratio,
+  with 16-point Gauss-Legendre where the difference would cancel and Laplace's continued
+  fraction in the tail. `ln b`, the log-vega and the distance to the upper bound are each
+  available without cancellation or underflow.
+- **`volsurf.market.implied`**: Jaeckel-style inversion with third-order Householder
+  steps on `ln b` and `ln(b_max - b)`, bracketed, from asymptotic starting points. It
+  returns the iterations and the branch used.
+- **`volsurf.market.parity`**:
+  - forward and discount factor per expiry from a repeated-median start and weighted,
+    trimmed least squares, with standard errors and a bid-ask "inside" check;
+  - a fixed-discount mode for American chains;
+  - a three-factor Nelson-Siegel discount curve.
+- **`volsurf.market.cleaning`**: eight named rules with a funnel that adds up, strike
+  arbitrage tested at the bid and the ask, and implied volatilities at the bid, mid and
+  ask.
+- **`volsurf.market.chains`** and **`volsurf chains fetch|list`**: local snapshots of
+  every listed expiry. SPX AM and SPXW PM settlement are told apart.
+- **Tests:**
+  - against mpmath at 50 and 60 digits, Jaeckel's `py_lets_be_rational` and QuantLib;
+  - on synthetic chains with known forwards and injected stale quotes;
+  - Hypothesis round trips;
+  - a regression test for the cascade in the arbitrage filter.
+- **Eight charts**, a methodology note, and ADRs 0009 to 0011.
+- **Four rows in `volsurf validate`**: the Black function in the far tails, the inversion
+  against its conditioning, prices from 1e-300 to 1e-10, and forward and rate recovery
+  from parity.
+
+### Changed
+
+- **`black76_price`** now evaluates the Mills-ratio form. The literal
+  `F N(d1) - K N(d2)` lost up to seven digits out of the money at small volatility.
+- **`implied_vol_black76` and `implied_vol_bsm`** now call the new inversion. Their
+  unused `tol` and `max_iter` arguments were removed.
+- **`mypy --strict`** now covers `volsurf.market`. `py_lets_be_rational` joins the dev
+  extras as an independent reference.
+
+### Fixed
+
+- **Implied volatility of small prices.** The v1.0 Newton iteration stopped on an
+  absolute price tolerance. It was right to 4e-12 above a normalised price of 1e-5,
+  which covers every real quote, but wrong by 18% by 1e-20 and by a factor of four by
+  1e-300.
+
 ## [1.2.0] - 2026-10-09
 
 Day 2: numerical engines. Lattices, finite differences and Monte Carlo, each held to

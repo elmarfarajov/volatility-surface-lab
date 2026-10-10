@@ -10,3 +10,6 @@
 | [0006](0006-crank-nicolson-starts-with-rannacher-steps.md) | Crank-Nicolson always starts with Rannacher's implicit half-steps | Accepted |
 | [0007](0007-monte-carlo-always-states-its-error.md) | Monte Carlo always states its error, and early exercise is given as two bounds | Accepted |
 | [0008](0008-tree-parameterisations-follow-their-papers.md) | Each tree follows its paper, and the differences from QuantLib are stated | Accepted |
+| [0009](0009-the-black-function-is-computed-through-the-mills-ratio.md) | The Black function is computed through the Mills ratio, never as a difference of two prices | Accepted |
+| [0010](0010-implied-volatility-is-inverted-on-log-price-objectives.md) | Implied volatility is inverted on log-price objectives, and its error is measured against the conditioning | Accepted |
+| [0011](0011-market-data-is-snapshotted-locally-and-cleaned-for-stated-reasons.md) | Market data is snapshotted locally, and every quote is kept or dropped for a stated reason | Accepted |

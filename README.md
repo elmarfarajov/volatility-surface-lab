@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)
 ![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
-[![Release](https://img.shields.io/badge/release-v1.2.0-e0632b)](https://github.com/elmarfarajov/volatility-surface-lab/releases)
+[![Release](https://img.shields.io/badge/release-v1.3.0-e0632b)](https://github.com/elmarfarajov/volatility-surface-lab/releases)
 ![mypy](https://img.shields.io/badge/mypy-strict-1b9e77)
 ![Validated](https://img.shields.io/badge/validated-QuantLib%20%7C%20mpmath%20%7C%20Haug-2f6fdb)
 
@@ -34,8 +34,8 @@ the charts in the [gallery](docs/GALLERY.md), and the decisions in the
 |---|---|---|
 | 1 | The analytic foundation: one model for every underlying, seventeen Greeks, three references | ✅ v1.1.0 |
 | 2 | Numerical engines: lattices, finite differences, Monte Carlo, with corrected references | ✅ v1.2.0 |
-| 3 | Implied volatility and real option chains | next |
-| 4 | The arbitrage-free surface: SVI, SSVI, densities | |
+| 3 | Implied volatility and real option chains: an exact inverse, parity forwards, clean quotes | ✅ v1.3.0 |
+| 4 | The arbitrage-free surface: SVI, SSVI, densities | next |
 | 5 | Heston: Fourier pricing, calibration, simulation | |
 | 6 | Local volatility and SABR | |
 | 7 | Exotic options | |
@@ -76,6 +76,27 @@ of its 20 cases, to be the price of a **Bermudan** put exercisable fifty times a
 ![Longstaff and Schwartz's 'American' prices are Bermudan prices](docs/images/longstaff-schwartz-table.png)
 
 The full account is in [numerical engines](docs/notes/numerical-engines.md).
+
+**Day 3: implied volatility and the market.**
+
+- **An exact Black function:** computed through the Mills ratio, so it never subtracts two
+  nearly equal prices. The textbook formula keeps nine digits of sixteen at small
+  volatility.
+- **An exact inverse:** a Jaeckel-style inversion within 4.0 condition numbers of the
+  truth on every well-posed quote, against 4.1 for Jaeckel's own code. The v1.0 Newton
+  iteration was wrong by 18% at a price of 1e-20 and by a factor of four at 1e-300.
+- **Clean real chains:**
+  - forwards and a discount curve from put-call parity across 53 SPX expiries;
+  - every quote kept or dropped for a stated reason;
+  - strike arbitrage tested where it could be traded, at the bid and the ask.
+
+Yahoo Finance's own implied volatilities turn out to assume zero rates and dividends:
+off by about four volatility points beyond a year, in opposite directions for puts and
+calls.
+
+![Implied volatility to the last digit](docs/images/iv-accuracy.png)
+
+The full account is in [implied volatility and the market](docs/notes/implied-volatility-and-the-market.md).
 
 ## Results on live S&P 500 options
 
@@ -160,7 +181,8 @@ flowchart LR
 | `analytic/` | Generalised Black-Scholes-Merton for every carry convention; seventeen Greeks to third order with limits at expiry; Merton's bounds and strike conditions; an arbitrary-precision reference and Haug's published examples |
 | `black_scholes.py` | Black-76 core in the forward, used throughout; its Greeks now come from `analytic/` |
 | `numerics/` | Five lattices with BBSR; Crank-Nicolson with Rannacher and early exercise; Monte Carlo with randomised quasi-random sampling and bracketed least-squares; high-precision American and Bermudan references |
-| `implied_vol.py` | Vectorised, bracket-safeguarded Newton inversion started at the price-volatility inflection point |
+| `market/` | The Black function through the Mills ratio; Jaeckel-style implied volatility, exact to its conditioning; forwards and discount curve from parity; chain snapshots and cleaning with stated reasons |
+| `implied_vol.py` | The original modules' entry points to the implied-volatility inversion in `market/` |
 | `lattice.py` | Leisen-Reimer and Cox-Ross-Rubinstein trees, European and American exercise |
 | `monte_carlo.py` | GBM with antithetic sampling and control variates; Heston QE scheme with martingale correction; Longstaff-Schwartz |
 | `heston.py` | "Little trap" characteristic function; COS pricer; Gil-Pelaez quadrature; per-path delta and dV/dv from one cosine series |
@@ -169,7 +191,7 @@ flowchart LR
 | `surface.py` | Monotone total-variance interpolation, Dupire local volatility, calendar diagnostics |
 | `calibration.py` | Vega-scaled least squares, market-informed multistart or differential evolution, exact-IV residual reporting |
 | `hedging.py` | Discrete delta-hedging P&L in Black-Scholes and Heston worlds for three hedge ratios |
-| `validation.py` | 24 checks against published benchmarks and independent methods |
+| `validation.py` | 28 checks against published benchmarks and independent methods |
 | `report.py`, `figures.py` | Self-contained HTML report with an interactive 3D surface; publication-style figures |
 | `gallery/` | The documentation's charts, registered by day and redrawn with `volsurf gallery` |
 | `app/streamlit_app.py` | Interactive dashboard: pricing lab, surface explorer, calibration and hedging lab |
