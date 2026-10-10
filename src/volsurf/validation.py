@@ -43,6 +43,7 @@ def _timed(fn: Callable[[], tuple[str, str, str, bool]]) -> tuple[tuple[str, str
 
 def run_validation(fast: bool = False) -> pd.DataFrame:
     checks: list[Check] = []
+    cache: dict[str, object] = {}
 
     def add(area: str, name: str, fn: Callable[[], tuple[str, str, str, bool]]) -> None:
         (reference, result, error, passed), seconds = _timed(fn)
@@ -457,6 +458,111 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
             forward_error < 1e-4 and rate_error < 5e-4,
         )
 
+    def _synthetic_surface():
+        from datetime import datetime, timezone
+
+        from .market.chains import Chain
+        from .market.cleaning import prepare
+        from .smile.build import build_surface
+
+        if "surface" not in cache:
+            params = HestonParams(v0=0.03, kappa=2.0, theta=0.04, sigma=0.6, rho=-0.7)
+            days = (23, 72, 170, 352) if fast else (9, 23, 44, 72, 107, 170, 261, 352, 534, 716)
+            raw = synthetic_chain(params, spot=5000.0, rate=0.04, dividend_yield=0.013, maturities_days=days)
+            quotes = raw.assign(root="SYN", is_call=raw["option_type"].eq("C"), last_trade=pd.Timestamp("2026-10-09", tz="UTC"))
+            chain = Chain("SYN", 5000.0, datetime(2026, 10, 9, 20, tzinfo=timezone.utc), quotes.assign(vendor_iv=np.nan))
+            cache["surface"] = build_surface(prepare(chain))
+        return cache["surface"]
+
+    def vogt_repair():
+        from .smile.fit import fit_slice
+        from .smile.ssvi import Quotes, fit_essvi
+        from .smile.svi import RawSVI, butterfly_check
+
+        vogt = RawSVI(-0.0410, 0.1331, 0.3060, 0.3586, 0.4153)
+        k = np.linspace(-1.5, 1.5, 31)
+        quotes = Quotes(1.0, k, vogt.implied_vol(k, 1.0), np.ones(k.size))
+        repaired = fit_slice(quotes, fit_essvi([quotes])[0].raw()).slice
+        before, after = butterfly_check(vogt), butterfly_check(repaired)
+        move = float(np.max(np.abs(repaired.implied_vol(k, 1.0) - quotes.iv)))
+        return (
+            "min g -0.0329 (Gatheral-Jacquier 2014)",
+            f"found {before.worst:.4f}; repaired min g {after.worst:+.1e}",
+            f"{100 * move:.2f} vol pts moved",
+            abs(before.worst + 0.0329) < 5e-4 and after.passed,
+        )
+
+    def ssvi_theorem():
+        from .smile.ssvi import SSVI
+        from .smile.svi import butterfly_check, calendar_check
+
+        rng = np.random.default_rng(14)
+        failures, n = 0, 40 if fast else 200
+        for _ in range(n):
+            rho = rng.uniform(-0.95, 0.95)
+            surface = SSVI(
+                rho,
+                rng.uniform(0.05, 1.0) * 2.0 / (1.0 + abs(rho)),
+                rng.uniform(0.01, 0.5),
+                np.arange(1.0, 6.0),
+                np.cumsum(rng.uniform(1e-4, 0.05, 5)),
+            )
+            raw = [s.raw() for s in surface.slices()]
+            failures += sum(not butterfly_check(r).passed for r in raw)
+            failures += sum(not calendar_check(a, b).passed for a, b in zip(raw[:-1], raw[1:], strict=True))
+        return (
+            "no arbitrage if eta(1+|rho|) <= 2, gamma <= 1/2",
+            f"{n} random surfaces, whole-line checks",
+            f"{failures} failures",
+            failures == 0,
+        )
+
+    def constrained_fit():
+        fit = _synthetic_surface()
+        rmse = max(f.rmse for f in fit.svi)
+        bfly = min(f.butterfly_margin for f in fit.svi)
+        cal = min(f.calendar_margin for f in fit.svi)
+        return (
+            "Heston chain; g >= 0 and w rising, whole line",
+            f"{len(fit.svi)} slices; min g {bfly:.1e}, min gap {cal:.1e}",
+            f"worst RMSE {100 * rmse:.2f} vol pts",
+            bfly >= 0 and cal >= 0 and rmse < 0.01,
+        )
+
+    def densities():
+        from .smile.density import moments
+
+        stats = [moments(f.slice) for f in _synthetic_surface().svi]
+        mass = max(abs(m.mass - 1) for m in stats)
+        mean = max(abs(m.forward - 1) for m in stats)
+        bl = max(m.breeden_litzenberger for m in stats)
+        return (
+            "mass 1, E[S_T] = F, Breeden-Litzenberger",
+            f"{len(stats)} slices",
+            f"{mass:.0e}; {mean:.0e}; BL {bl:.0e}",
+            mass < 1e-8 and mean < 1e-8 and bl < 1e-4,
+        )
+
+    def price_interpolation():
+        surface = _synthetic_surface().surface
+        k = np.linspace(-0.8, 0.5, 651)
+        h = k[1] - k[0]
+        worst, monotone, previous = np.inf, np.inf, None
+        for t in np.linspace(0.01, surface.maturities[-1] * 1.5, 60 if fast else 200):
+            c = surface.call(k, t)
+            worst = min(
+                worst, float(np.min(np.exp(-k[1:-1]) * ((c[2:] - 2 * c[1:-1] + c[:-2]) / h**2 - (c[2:] - c[:-2]) / (2 * h))))
+            )
+            if previous is not None:
+                monotone = min(monotone, float(np.min(c - previous)))
+            previous = c
+        return (
+            "density >= 0, calls rising in t",
+            "between and beyond expiries",
+            f"min density {worst:.1e}; min dC {monotone:.1e}",
+            worst > -1e-9 and monotone > -1e-12,
+        )
+
     add("Analytic", "Published examples", haug)
     add("Analytic", "Seventeen Greeks vs arbitrary precision", mpmath_greeks)
     add("Analytic", "Black-Scholes PDE from the Greeks", pde)
@@ -483,6 +589,11 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
     add("Heston", "Andersen QE Monte Carlo", heston_mc)
     add("Heston", "COS delta and variance sensitivity", heston_greeks)
     add("SVI", "Butterfly-arbitrage detection", svi_vogt)
+    add("Surface", "Vogt's slice found and repaired", vogt_repair)
+    add("Surface", "SSVI theorem, checked on the whole line", ssvi_theorem)
+    add("Surface", "Constrained SVI on a Heston chain", constrained_fit)
+    add("Surface", "Risk-neutral densities", densities)
+    add("Surface", "Price interpolation in time", price_interpolation)
     add("Calibration", "Parameter recovery", calibration_recovery)
     add("Hedging", "Discrete-hedging error vs theory", derman_kamal)
 
