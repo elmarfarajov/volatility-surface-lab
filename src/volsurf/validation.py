@@ -383,13 +383,91 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
         worst = float(np.max(np.abs(terms.sum(axis=0)) / np.maximum(np.abs(terms).max(axis=0), 1e-300)))
         return "dV/dt + (r-q)S V_S + sigma^2 S^2 V_SS / 2 - rV = 0", "20,000 random contracts", f"{worst:.1e}", worst < 1e-10
 
+    def black_tails():
+        import mpmath as mp
+
+        from .market.black import log_otm_value
+
+        rng = np.random.default_rng(12)
+        n = 300 if fast else 1500
+        x, s = -(10 ** rng.uniform(-6, 1.2, n)), 10 ** rng.uniform(-3, 1.2, n)
+        worst = 0.0
+        for xi, si, lb in zip(x, s, log_otm_value(x, s), strict=True):
+            with mp.workdps(60):
+                xm, sm = mp.mpf(float(xi)), mp.mpf(float(si))  # divide in 60 digits, not in double precision
+                exact = mp.log(mp.ncdf(xm / sm + sm / 2) * mp.exp(xm / 2) - mp.ncdf(xm / sm - sm / 2) * mp.exp(-xm / 2))
+            worst = max(worst, abs(lb - float(exact)) / max(1.0, abs(float(exact))))
+        return "mpmath, 60 digits", f"{n:,} prices down to 1e-2000 (ln b)", f"{worst:.1e} (relative, ln b)", worst < 1e-15
+
+    def iv_conditioning():
+        import mpmath as mp
+
+        from .market.black import log_vega
+        from .market.implied import invert_normalised
+
+        rng = np.random.default_rng(13)
+        n = 600 if fast else 3000
+        x, s = rng.uniform(-6, 6, n), 10 ** rng.uniform(-3, 1, n)
+        call = rng.random(n) < 0.5
+        beta = np.empty(n)
+        for i, (xi, si, ci) in enumerate(zip(x, s, call, strict=True)):
+            with mp.workdps(50):
+                xs, sm = mp.mpf(float(xi if ci else -xi)), mp.mpf(float(si))
+                beta[i] = float(mp.ncdf(xs / sm + sm / 2) * mp.exp(xs / 2) - mp.ncdf(xs / sm - sm / 2) * mp.exp(-xs / 2))
+        eps = np.finfo(float).eps
+        with np.errstate(divide="ignore", over="ignore"):
+            kappa = eps * np.maximum(beta, 1e-300) / (s * np.exp(log_vega(-np.abs(x), s))) + eps
+        ok = (beta > 0) & (kappa < 1e-3)
+        result = invert_normalised(beta[ok], x[ok], call[ok])
+        ratio = float(np.max(np.abs(result.total_vol - s[ok]) / s[ok] / kappa[ok]))
+        return (
+            "50-digit prices; error / condition number",
+            f"{ok.sum():,} quotes, at most {result.iterations.max()} iterations",
+            f"{ratio:.1f} x conditioning",
+            ratio < 8.0 and not np.isnan(result.total_vol).any(),
+        )
+
+    def iv_tiny_prices():
+        from .market.black import log_otm_value
+        from .market.implied import invert_normalised
+
+        xx, ss = np.meshgrid(-np.linspace(0.05, 4.0, 80), np.geomspace(0.003, 0.2, 80))
+        beta = np.exp(log_otm_value(xx, ss))
+        tiny = (beta > 1e-300) & (beta < 1e-10)
+        worst = float(np.max(np.abs(invert_normalised(beta[tiny], xx[tiny]).total_vol - ss[tiny]) / ss[tiny]))
+        return "exact total volatility", f"{tiny.sum():,} prices, 1e-300..1e-10 (v1.0: 400% off)", f"{worst:.1e}", worst < 1e-12
+
+    def parity_recovery():
+        from datetime import datetime, timezone
+
+        from .market.chains import Chain
+        from .market.cleaning import prepare
+
+        params = HestonParams(v0=0.03, kappa=2.0, theta=0.04, sigma=0.6, rho=-0.7)
+        raw = synthetic_chain(params, spot=5000.0, rate=0.04, dividend_yield=0.013, maturities_days=(44, 107, 261, 534))
+        quotes = raw.assign(root="SYN", is_call=raw["option_type"].eq("C"), last_trade=pd.Timestamp("2026-10-09", tz="UTC"))
+        chain = Chain("SYN", 5000.0, datetime(2026, 10, 9, 20, tzinfo=timezone.utc), quotes.assign(vendor_iv=np.nan))
+        market = prepare(chain)
+        forward_error = max(abs(s.forward / (5000.0 * np.exp(0.027 * s.maturity)) - 1) for s in market.slices)
+        rate_error = max(abs(float(market.curve.rate(s.maturity)) - 0.04) for s in market.slices)
+        return (
+            "F = S e^{(r-q)T}, r = 4%",
+            f"{len(market.slices)} expiries, {market.funnel()['kept']:,} quotes kept",
+            f"F {forward_error:.1e} (rel); r {rate_error * 1e4:.1f} bp",
+            forward_error < 1e-4 and rate_error < 5e-4,
+        )
+
     add("Analytic", "Published examples", haug)
     add("Analytic", "Seventeen Greeks vs arbitrary precision", mpmath_greeks)
     add("Analytic", "Black-Scholes PDE from the Greeks", pde)
     add("Black-Scholes", "Call price", bs_hull)
     add("Black-Scholes", "Put-call parity, 5,000 random contracts", parity)
     add("Black-Scholes", "Analytic Greeks", greeks_fd)
-    add("Implied vol", "Round trip, safeguarded Newton", iv_roundtrip)
+    add("Implied vol", "Round trip, 20,000 random quotes", iv_roundtrip)
+    add("Implied vol", "Normalised Black in the far tails", black_tails)
+    add("Implied vol", "Inversion vs its conditioning", iv_conditioning)
+    add("Implied vol", "Prices from 1e-300 to 1e-10", iv_tiny_prices)
+    add("Market", "Forward and rate from parity", parity_recovery)
     add("Lattice", "Leisen-Reimer vs CRR convergence", lr_tree)
     add("Lattice", "American put S=36, K=40", american_tree)
     add("Lattice", "BBSR on the American references", bbsr_reference)
