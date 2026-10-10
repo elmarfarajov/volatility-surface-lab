@@ -17,6 +17,8 @@ def _close():
 
 @pytest.mark.parametrize("item", gallery.items(), ids=lambda item: item.filename)
 def test_every_chart_draws(item):
+    if not item.available():
+        pytest.skip("drawn from a local option-chain snapshot, which this machine does not have")
     figure = item.build()
     assert figure.axes and item.day in gallery.DAYS
 

@@ -11,3 +11,4 @@ reports/
 .streamlit/secrets.toml
 .vscode/
 .idea/
+data/

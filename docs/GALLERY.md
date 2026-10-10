@@ -53,3 +53,37 @@ Every chart is rebuilt from source with `volsurf gallery`. The figures of the li
 **Least-squares Monte Carlo, bracketed from both sides** - The out-of-sample lower bound and the dual upper bound around the Bermudan value.
 
 ![Least-squares Monte Carlo, bracketed from both sides](images/early-exercise-bounds.png)
+
+## Day 3: Implied volatility and the market
+
+**The textbook Black formula cancels in the wings** - Out-of-the-money prices against 60-digit arithmetic: the literal formula and the Mills-ratio form.
+
+![The textbook Black formula cancels in the wings](images/black-cancellation.png)
+
+**Implied volatility to the last digit** - The v1.0 Newton inversion and the Jaeckel-style one, against exact prices from 1e-300 to the forward.
+
+![Implied volatility to the last digit](images/iv-accuracy.png)
+
+**How many steps the inversion takes** - Householder iterations over strike and volatility, and their distribution over random quotes.
+
+![How many steps the inversion takes](images/inversion-iterations.png)
+
+**Forwards and discount factors from put-call parity** - S&P 500 options: the synthetic forward, its residuals, the implied rate curve and dividend yield.
+
+![Forwards and discount factors from put-call parity](images/parity-forward.png)
+
+**Parity is an equality for European options only** - SPX against SPY and Apple: early exercise bends the synthetic forward.
+
+![Parity is an equality for European options only](images/american-parity.png)
+
+**From a raw chain to clean quotes** - What each cleaning rule removes, and the largest executable arbitrage in the chain.
+
+![From a raw chain to clean quotes](images/cleaning-funnel.png)
+
+**The S&P 500 smile across the term structure** - Bid, mid and ask implied volatility from a week to two years, with the vendor's figures.
+
+![The S&P 500 smile across the term structure](images/market-smiles.png)
+
+**Yahoo Finance's implied volatilities assume zero rates** - The vendor's figures against parity forwards, and the assumption that reproduces them.
+
+![Yahoo Finance's implied volatilities assume zero rates](images/vendor-iv.png)

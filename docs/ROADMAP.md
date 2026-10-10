@@ -15,8 +15,8 @@ real market data, or properties that must hold for any input.
 |---|---|---|---|---|
 | 1 | The analytic foundation: generalised Black-Scholes-Merton, seventeen Greeks, independent references | #1 | v1.1.0 | ✅ Done |
 | 2 | Numerical engines: lattices, finite differences and Monte Carlo against high-precision references | #2 | v1.2.0 | ✅ Done |
-| 3 | Implied volatility and the market: robust inversion, forward extraction, real option chains | #3 | v1.3.0 | Next |
-| 4 | The arbitrage-free surface: SVI and SSVI, calendar and butterfly conditions, wings and densities | #4 | v1.4.0 | |
+| 3 | Implied volatility and the market: robust inversion, forward extraction, real option chains | #3 | v1.3.0 | ✅ Done |
+| 4 | The arbitrage-free surface: SVI and SSVI, calendar and butterfly conditions, wings and densities | #4 | v1.4.0 | Next |
 | 5 | Heston: characteristic functions, Fourier pricing, calibration and simulation | #5 | v1.5.0 | |
 | 6 | Local volatility and SABR: Dupire in implied-volatility form, Hagan and its corrections | #6 | v1.6.0 | |
 | 7 | Exotic options: barriers, Asians, lookbacks and digitals, analytic against simulation | #7 | v1.7.0 | |
@@ -69,3 +69,26 @@ real market data, or properties that must hold for any input.
   Offengenden's (2016) high-precision values.
 
 **Notes:** [numerical engines](notes/numerical-engines.md).
+
+## Day 3 - implied volatility and the market ✅
+
+**Issue #3, release v1.3.0.**
+
+- **An exact Black function.** Prices come through the Mills ratio, with quadrature where
+  the difference would cancel. `ln b` matches 60-digit arithmetic to a few roundings,
+  down to `ln b = -6.8 million`. The textbook formula keeps nine digits of sixteen at
+  total volatility 0.02.
+- **An exact inverse.** The inversion is Jaeckel-style, with Householder steps on
+  log-price objectives. Its worst error is 4.0 condition numbers on 1,816 well-posed
+  quotes, against 4.1 for Jaeckel's own implementation. The v1.0 Newton iteration was
+  wrong by 18% at a price of 1e-20 and by a factor of four at 1e-300.
+- **Forwards from parity.** A repeated-median start, trimmed weighted least squares and
+  one Nelson-Siegel curve across 52 SPX expiries give forwards to a median of 0.04
+  index points. American chains, SPY and Apple, bend parity, and are fitted near the
+  money only.
+- **Clean real chains.** Snapshots are stored locally, and every quote is kept or
+  dropped by a named rule. Strike arbitrage is tested at the bid and the ask; the first
+  removal rule ate 364 good quotes of one expiry before it was fixed. Yahoo Finance's
+  own implied volatilities turn out to assume zero rates and dividends.
+
+**Notes:** [implied volatility and the market](notes/implied-volatility-and-the-market.md).

@@ -147,6 +147,22 @@ def cmd_gallery(args: argparse.Namespace) -> None:
     print(f"{len(written)} charts written to {args.out}")
 
 
+def cmd_chains(args: argparse.Namespace) -> None:
+    from .market import chains
+
+    if args.action == "fetch":
+        for ticker in args.tickers:
+            print(f"{ticker}: stored {chains.fetch(ticker)}")
+        return
+    stored = chains.snapshots()
+    if not stored:
+        print(f"no snapshots under {chains.data_root()}; run `volsurf chains fetch ^SPX`")
+    for day, ticker in stored:
+        chain = chains.load(ticker, day)
+        expiries, quotes = len(chain.expiries()), len(chain.quotes)
+        print(f"{day}  {ticker:<6} spot {chain.spot:>10,.2f}  {expiries:>3} expiries  {quotes:>6,} quotes")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="volsurf", description="Option pricing, volatility surfaces and Heston calibration.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -201,6 +217,11 @@ def build_parser() -> argparse.ArgumentParser:
     charts.add_argument("--out", default="docs/images")
     charts.add_argument("--only", default=None, help="one chart's file name, or a day's number")
     charts.set_defaults(func=cmd_gallery)
+
+    snapshot = sub.add_parser("chains", help="store option-chain snapshots from Yahoo Finance, or list them")
+    snapshot.add_argument("action", choices=["fetch", "list"])
+    snapshot.add_argument("tickers", nargs="*", default=["^SPX", "SPY", "AAPL"])
+    snapshot.set_defaults(func=cmd_chains)
     return parser
 
 
