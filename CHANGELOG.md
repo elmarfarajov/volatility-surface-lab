@@ -4,6 +4,49 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-10-11
+
+Day 4: the arbitrage-free surface. Smiles and the surface between them are now free of
+static arbitrage on the whole real line. The original fitter was not.
+
+### Added
+
+- **`volsurf.smile.svi`**: raw, natural and jump-wings SVI with exact conversions and
+  analytic derivatives. Butterfly and calendar checks cover the whole real line: the wings
+  through Lee's bound, the finite part by an asinh grid refined by Brent's method.
+- **`volsurf.smile.ssvi`**:
+  - SSVI with the power-law `phi`, arbitrage-free by its parameterisation;
+  - eSSVI fitted slice by slice, with box bounds that carry the butterfly conditions and
+    rising wing slopes.
+- **`volsurf.smile.fit`**: raw SVI fitted under hard butterfly, Lee and calendar
+  constraints by the exchange method for semi-infinite programmes, started from eSSVI.
+- **`volsurf.smile.interpolation`**: Gatheral and Jacquier's price interpolation of
+  out-of-the-money options between expiries, and a log-normal convolution, by
+  Gauss-Hermite, beyond the last. Implied volatilities come through the Day 3 inversion.
+- **`volsurf.smile.density`**: risk-neutral densities in closed form, with mass, martingale
+  and Breeden-Litzenberger checks.
+- **`volsurf.smile.build`**: from a cleaned Day 3 market to every model in one call.
+- **Tests:**
+  - Hypothesis round trips of the parameterisations;
+  - Vogt's slice, and arbitrage beyond any fitting grid;
+  - the SSVI theorem on random surfaces, and parameter recovery;
+  - a constrained surface on a Heston chain, with its densities;
+  - interpolation free of arbitrage and exact at the nodes, and extrapolation against
+    brute-force convolution.
+- **Seven charts**, a methodology note, and ADRs 0012 to 0014.
+- **Five rows in `volsurf validate`**: Vogt found and repaired, the SSVI theorem, the
+  constrained fit, densities, and price interpolation.
+
+### Found
+
+- **The v1.0 surface admits arbitrage.** On the SPX chain of 9 October 2026:
+  - 36 of its 48 slices have a negative density somewhere;
+  - 31 of 47 neighbouring pairs cross;
+  - its interpolation reaches `g = -3.9` between expiries.
+
+  `volsurf analyze` still uses it; the pipeline moves to `volsurf.smile` with the Day 9
+  platform work.
+
 ## [1.3.0] - 2026-10-10
 
 Day 3: implied volatility and the market. The Black function and its inverse are now

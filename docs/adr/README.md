@@ -13,3 +13,6 @@
 | [0009](0009-the-black-function-is-computed-through-the-mills-ratio.md) | The Black function is computed through the Mills ratio, never as a difference of two prices | Accepted |
 | [0010](0010-implied-volatility-is-inverted-on-log-price-objectives.md) | Implied volatility is inverted on log-price objectives, and its error is measured against the conditioning | Accepted |
 | [0011](0011-market-data-is-snapshotted-locally-and-cleaned-for-stated-reasons.md) | Market data is snapshotted locally, and every quote is kept or dropped for a stated reason | Accepted |
+| [0012](0012-no-arbitrage-conditions-are-constraints-checked-on-the-whole-line.md) | No-arbitrage conditions are hard constraints, checked on the whole real line | Accepted |
+| [0013](0013-between-expiries-prices-are-interpolated.md) | Between expiries prices are interpolated, and beyond the last the distribution is convolved | Accepted |
+| [0014](0014-ssvi-and-essvi-are-kept-as-arbitrage-free-starts.md) | SSVI and eSSVI are kept as arbitrage-free starting points, not as the fitted surface | Accepted |

@@ -16,8 +16,8 @@ real market data, or properties that must hold for any input.
 | 1 | The analytic foundation: generalised Black-Scholes-Merton, seventeen Greeks, independent references | #1 | v1.1.0 | ✅ Done |
 | 2 | Numerical engines: lattices, finite differences and Monte Carlo against high-precision references | #2 | v1.2.0 | ✅ Done |
 | 3 | Implied volatility and the market: robust inversion, forward extraction, real option chains | #3 | v1.3.0 | ✅ Done |
-| 4 | The arbitrage-free surface: SVI and SSVI, calendar and butterfly conditions, wings and densities | #4 | v1.4.0 | Next |
-| 5 | Heston: characteristic functions, Fourier pricing, calibration and simulation | #5 | v1.5.0 | |
+| 4 | The arbitrage-free surface: SVI and SSVI, calendar and butterfly conditions, wings and densities | #4 | v1.4.0 | ✅ Done |
+| 5 | Heston: characteristic functions, Fourier pricing, calibration and simulation | #5 | v1.5.0 | Next |
 | 6 | Local volatility and SABR: Dupire in implied-volatility form, Hagan and its corrections | #6 | v1.6.0 | |
 | 7 | Exotic options: barriers, Asians, lookbacks and digitals, analytic against simulation | #7 | v1.7.0 | |
 | 8 | Hedging and model risk: Greeks P&L explain, discrete hedging, the book's risk | #8 | v1.8.0 | |
@@ -92,3 +92,24 @@ real market data, or properties that must hold for any input.
   own implied volatilities turn out to assume zero rates and dividends.
 
 **Notes:** [implied volatility and the market](notes/implied-volatility-and-the-market.md).
+
+## Day 4 - the arbitrage-free surface ✅
+
+**Issue #4, release v1.4.0.**
+
+- **Checks on the whole real line.** Butterfly and calendar arbitrage are checked with the
+  wings settled analytically through Lee's bound and the finite part searched and
+  refined. Vogt's slice is caught at the published `g = -0.0329`.
+- **The original surface had arbitrage.** Its penalised fit left a negative density in 36
+  of 48 SPX slices and crossings in 31 of 47 pairs, and its interpolation reached
+  `g = -3.9` between expiries.
+- **Hard constraints.** Raw SVI is fitted by the exchange method for semi-infinite
+  programmes, started from eSSVI. All 48 slices are arbitrage-free, at a median error of
+  0.19 vol points against 0.16 for the unconstrained fit. SSVI's three-parameter shape,
+  not its conditions, keeps it 2.6 points away.
+- **Prices between expiries.** Gatheral and Jacquier's price interpolation between
+  expiries, and a log-normal convolution beyond the last, keep every intermediate smile a
+  valid distribution. Densities integrate to one and have the forward as their mean to
+  2e-16.
+
+**Notes:** [the arbitrage-free surface](notes/the-arbitrage-free-surface.md).

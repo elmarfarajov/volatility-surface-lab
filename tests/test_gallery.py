@@ -57,3 +57,15 @@ def test_the_cli_prints_seventeen_greeks(capsys):
     out = capsys.readouterr().out
     assert "Black-76 call" in out and "0.5946286597" in out  # Haug's futures delta, 0.5946
     assert len([line for line in out.splitlines() if line.startswith("  ")]) == 17
+
+
+def test_gallery_files_never_overwrite_the_pipeline_figures():
+    # Day 4 once wrote its density chart over the README's pipeline figure of the same name
+    import re
+    from pathlib import Path
+
+    import volsurf.report
+
+    source = Path(volsurf.report.__file__).read_text(encoding="utf-8")
+    pipeline = set(re.findall(r'fig_dir / "([\w-]+\.png)"', source))
+    assert pipeline and not pipeline & {item.filename for item in gallery.items()}

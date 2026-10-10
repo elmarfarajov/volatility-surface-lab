@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)
 ![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
-[![Release](https://img.shields.io/badge/release-v1.3.0-e0632b)](https://github.com/elmarfarajov/volatility-surface-lab/releases)
+[![Release](https://img.shields.io/badge/release-v1.4.0-e0632b)](https://github.com/elmarfarajov/volatility-surface-lab/releases)
 ![mypy](https://img.shields.io/badge/mypy-strict-1b9e77)
 ![Validated](https://img.shields.io/badge/validated-QuantLib%20%7C%20mpmath%20%7C%20Haug-2f6fdb)
 
@@ -35,8 +35,8 @@ the charts in the [gallery](docs/GALLERY.md), and the decisions in the
 | 1 | The analytic foundation: one model for every underlying, seventeen Greeks, three references | ✅ v1.1.0 |
 | 2 | Numerical engines: lattices, finite differences, Monte Carlo, with corrected references | ✅ v1.2.0 |
 | 3 | Implied volatility and real option chains: an exact inverse, parity forwards, clean quotes | ✅ v1.3.0 |
-| 4 | The arbitrage-free surface: SVI, SSVI, densities | next |
-| 5 | Heston: Fourier pricing, calibration, simulation | |
+| 4 | The arbitrage-free surface: SVI under hard constraints, price interpolation, densities | ✅ v1.4.0 |
+| 5 | Heston: Fourier pricing, calibration, simulation | next |
 | 6 | Local volatility and SABR | |
 | 7 | Exotic options | |
 | 8 | Hedging and model risk | |
@@ -97,6 +97,22 @@ calls.
 ![Implied volatility to the last digit](docs/images/iv-accuracy.png)
 
 The full account is in [implied volatility and the market](docs/notes/implied-volatility-and-the-market.md).
+
+**Day 4: the arbitrage-free surface.**
+
+- **The original surface had arbitrage.** Checked on the whole real line, its penalised SVI
+  fit left a negative density in 36 of 48 S&P 500 slices and crossings in 31 of 47 pairs.
+  Between expiries its interpolation reached `g = -3.9`.
+- **Hard constraints instead of penalties:** raw SVI fitted by the exchange method,
+  arbitrage-free on every slice, at 0.19 vol points of median error against 0.16 for the
+  unconstrained fit.
+- **Prices between expiries:** Gatheral and Jacquier's price interpolation, with a
+  log-normal convolution beyond the last expiry. Every intermediate smile is a valid
+  distribution.
+
+![The original surface had arbitrage](docs/images/v1-arbitrage.png)
+
+The full account is in [the arbitrage-free surface](docs/notes/the-arbitrage-free-surface.md).
 
 ## Results on live S&P 500 options
 
@@ -182,6 +198,7 @@ flowchart LR
 | `black_scholes.py` | Black-76 core in the forward, used throughout; its Greeks now come from `analytic/` |
 | `numerics/` | Five lattices with BBSR; Crank-Nicolson with Rannacher and early exercise; Monte Carlo with randomised quasi-random sampling and bracketed least-squares; high-precision American and Bermudan references |
 | `market/` | The Black function through the Mills ratio; Jaeckel-style implied volatility, exact to its conditioning; forwards and discount curve from parity; chain snapshots and cleaning with stated reasons |
+| `smile/` | SVI in three parameterisations with whole-line arbitrage checks; SSVI and eSSVI; raw SVI under hard constraints; price interpolation in time; risk-neutral densities |
 | `implied_vol.py` | The original modules' entry points to the implied-volatility inversion in `market/` |
 | `lattice.py` | Leisen-Reimer and Cox-Ross-Rubinstein trees, European and American exercise |
 | `monte_carlo.py` | GBM with antithetic sampling and control variates; Heston QE scheme with martingale correction; Longstaff-Schwartz |
@@ -191,7 +208,7 @@ flowchart LR
 | `surface.py` | Monotone total-variance interpolation, Dupire local volatility, calendar diagnostics |
 | `calibration.py` | Vega-scaled least squares, market-informed multistart or differential evolution, exact-IV residual reporting |
 | `hedging.py` | Discrete delta-hedging P&L in Black-Scholes and Heston worlds for three hedge ratios |
-| `validation.py` | 28 checks against published benchmarks and independent methods |
+| `validation.py` | 33 checks against published benchmarks and independent methods |
 | `report.py`, `figures.py` | Self-contained HTML report with an interactive 3D surface; publication-style figures |
 | `gallery/` | The documentation's charts, registered by day and redrawn with `volsurf gallery` |
 | `app/streamlit_app.py` | Interactive dashboard: pricing lab, surface explorer, calibration and hedging lab |
