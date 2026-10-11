@@ -132,7 +132,12 @@ class JumpWings:
     maturity: float
 
     def raw(self) -> RawSVI:
-        """Inverse of :meth:`RawSVI.jump_wings` (Gatheral and Jacquier, 2014, Lemma 3.2)."""
+        """Inverse of :meth:`RawSVI.jump_wings` (Gatheral and Jacquier, 2014, Lemma 3.2).
+
+        Ill-conditioned near a symmetric slice with its minimum at the money, where ``m``
+        comes from the small difference ``(v - v_min) T``: measured round-trip errors are
+        2e-9 at ``rho = m/sigma = 0.1``, 5e-5 at 0.015, and the inverse fails at 0.005.
+        """
         w0 = self.v * self.maturity
         root = np.sqrt(w0)
         b = 0.5 * root * (self.c + self.p)
