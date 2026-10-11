@@ -36,7 +36,8 @@ Against Lewis's integral evaluated to 40 digits with mpmath:
 
 - **Accuracy:** against the 40-digit reference, the contour engine is within 1e-14 in
   both wings for one week, one year and ten years. The one exception is a one-week call
-  worth 4e-12 of the forward, at 3e-11.
+  worth 4e-12 of the forward: right to about 1e-21 of the forward, which is 3e-11 relative
+  on Windows and 3e-10 on CI's Linux. The difference is the platform's maths library.
 - **Agreement:** it agrees with QuantLib to 2e-14 near the money.
 - **A published value was wrong.** Fang and Oosterlee's (2008) printed reference,
   5.785155450, is off by 1.6e-8; the 40-digit value is 5.78515543437619. The validation

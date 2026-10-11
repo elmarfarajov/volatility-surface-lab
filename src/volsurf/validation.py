@@ -573,7 +573,8 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
             spread = 4.0 * np.sqrt(max(h.theta * t, h.v0 * t))
             k = np.array([-1.4, -0.3, 0.0, 0.3, 1.1]) * spread
             exact = np.array([reference(float(x), t, h) for x in k])
-            worst = max(worst, float(np.max(np.abs(otm_price(k, t, h) - exact) / exact)))
+            # relative error, with an absolute floor of 1e-20 of the forward for prices near 1e-12
+            worst = max(worst, float(np.max(np.abs(otm_price(k, t, h) - exact) / np.maximum(exact, 1e-10))))
             count += k.size
         return (
             "Lewis's integral, 40 digits (mpmath)",
