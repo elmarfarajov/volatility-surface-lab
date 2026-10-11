@@ -60,8 +60,10 @@ def test_contour_engine_matches_40_digits_in_both_wings(case):
     spread = 4.0 * np.sqrt(max(h.theta * t, h.v0 * t))
     k = np.array([-1.5, -0.4, 0.0, 0.4, 1.2]) * spread
     exact = np.array([reference(float(x), t, h) for x in k])
-    np.testing.assert_allclose(otm_price(k, t, h), exact, rtol=1e-10)
-    np.testing.assert_allclose(otm_price(k, t, h, per_strike=True), exact, rtol=1e-10)
+    # an absolute floor of 1e-20 of the forward: a one-week call worth 4e-12 is right to about 1e-21, which is
+    # 3e-11 relative on one machine and 3e-10 on another - the platform's libm, not the method
+    np.testing.assert_allclose(otm_price(k, t, h), exact, rtol=1e-10, atol=1e-20)
+    np.testing.assert_allclose(otm_price(k, t, h, per_strike=True), exact, rtol=1e-10, atol=1e-20)
 
 
 def test_the_damping_does_not_matter_inside_the_strip():
