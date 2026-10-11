@@ -13,7 +13,7 @@ from pathlib import Path
 
 from matplotlib.figure import Figure
 
-from . import analytic, market, numerics, smiles
+from . import analytic, heston, market, numerics, smiles
 from .style import save
 
 DAYS: dict[int, str] = {
@@ -21,6 +21,7 @@ DAYS: dict[int, str] = {
     2: "Numerical engines",
     3: "Implied volatility and the market",
     4: "The arbitrage-free surface",
+    5: "Heston",
 }
 
 
@@ -237,6 +238,57 @@ def items() -> tuple[Item, ...]:
             "Wing slopes against Lee's bound, and the moments of the index they imply.",
             smiles.lee_wings,
             4,
+            "snapshot",
+        ),
+        Item(
+            "heston-engines.png",
+            "Heston prices to the last digit",
+            "Five engines against a 40-digit reference, far into both wings.",
+            heston.engine_accuracy,
+            5,
+        ),
+        Item(
+            "contour-damping.png",
+            "Where the contour runs",
+            "The integrand by damping, and why the quadrature is graded towards the origin.",
+            heston.contour_damping,
+            5,
+        ),
+        Item(
+            "simulation-bias.png",
+            "Simulating Heston across the Feller boundary",
+            "Euler with full truncation and Andersen's QE against exact prices.",
+            heston.simulation_bias,
+            5,
+        ),
+        Item(
+            "qe-transition.png",
+            "QE against the exact variance transition",
+            "One step near zero: exact non-central chi-squared, QE and Euler.",
+            heston.qe_transition,
+            5,
+        ),
+        Item(
+            "moment-explosion.png",
+            "The moment strip and the wings it implies",
+            "Moment explosion through time, and Lee's wing slopes.",
+            heston.moment_explosion,
+            5,
+        ),
+        Item(
+            "heston-calibration.png",
+            "Heston calibrated to the S&P 500",
+            "Smiles from a month to two years against the bid-ask, and where five parameters fall short.",
+            heston.heston_calibration,
+            5,
+            "snapshot",
+        ),
+        Item(
+            "heston-identifiability.png",
+            "What the S&P 500 surface pins down",
+            "Multistart, the profile in kappa, and the least determined direction of the Jacobian.",
+            heston.heston_identifiability,
+            5,
             "snapshot",
         ),
     )
