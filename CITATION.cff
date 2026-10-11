@@ -1,4 +1,4 @@
-cff-version: 1.4.0
+cff-version: 1.5.0
 message: "If you use this software, please cite it as below."
 title: "Volatility Surface Lab: option pricing, arbitrage-controlled volatility surfaces, Heston calibration and hedging model risk"
 authors:

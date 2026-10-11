@@ -4,6 +4,47 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-10-11
+
+Day 5: Heston. Prices to the last digit in both wings, a published reference corrected,
+calibration that reports what it can identify, and simulation across the Feller boundary.
+
+### Added
+
+- **`volsurf.stochvol.characteristic`**: the little-trap characteristic function, exact
+  mean and stencil variance of the log-price, and the moment strip from Andersen and
+  Piterbarg's explosion time.
+- **`volsurf.stochvol.pricing`**: out-of-the-money prices by Carr and Madan's contour
+  integral with Lee's extension. The damping is Lord and Kahl's, kept off the edges of the
+  strip; the quadrature is composite Gauss-Legendre graded towards the origin, with one set
+  of characteristic-function values per side. COS and the Carr-Madan FFT are kept for
+  comparison.
+- **`volsurf.stochvol.calibration`**: bid-ask-weighted calibration in implied volatility,
+  with multistart, Jacobian singular values and a profile in `kappa`.
+- **`volsurf.stochvol.simulation`**: Euler with full truncation and Andersen's QE with the
+  martingale correction, the exact non-central chi-squared transition, and Monte Carlo
+  estimates with standard errors.
+- **Tests:**
+  - against Lewis's integral at 40 digits, QuantLib and an independent quadrature;
+  - explosion times and their limit;
+  - calibration recovery and the profile;
+  - QE against the exact transition, and the Feller-boundary bias.
+- **Seven charts**, a methodology note, and ADRs 0015 to 0017.
+- **Six rows in `volsurf validate`**:
+  - the contour engine against 40 digits, the published price and QuantLib;
+  - calibration recovery;
+  - QE and Euler below the Feller boundary;
+  - the moment strip.
+
+### Found
+
+- **The v1.0 Heston engines lose the out-of-the-money wing.** COS was 1e-5 wrong a year out
+  at `ln(K/F) = 0.64`, and both COS and Gil-Pelaez were about 100% wrong for a deep ten-year
+  call. `volsurf analyze` still uses them, and moves to `volsurf.stochvol` with the Day 9
+  platform work.
+- **Fang and Oosterlee's (2008) printed reference price is off in its eighth digit**:
+  5.785155450 against 5.78515543437619 at 40 digits.
+
 ## [1.4.0] - 2026-10-11
 
 Day 4: the arbitrage-free surface. Smiles and the surface between them are now free of
