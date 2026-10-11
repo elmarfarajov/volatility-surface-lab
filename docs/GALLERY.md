@@ -117,3 +117,33 @@ Every chart is rebuilt from source with `volsurf gallery`. The figures of the li
 **What the wings say about the moments** - Wing slopes against Lee's bound, and the moments of the index they imply.
 
 ![What the wings say about the moments](images/lee-wings.png)
+
+## Day 5: Heston
+
+**Heston prices to the last digit** - Five engines against a 40-digit reference, far into both wings.
+
+![Heston prices to the last digit](images/heston-engines.png)
+
+**Where the contour runs** - The integrand by damping, and why the quadrature is graded towards the origin.
+
+![Where the contour runs](images/contour-damping.png)
+
+**Simulating Heston across the Feller boundary** - Euler with full truncation and Andersen's QE against exact prices.
+
+![Simulating Heston across the Feller boundary](images/simulation-bias.png)
+
+**QE against the exact variance transition** - One step near zero: exact non-central chi-squared, QE and Euler.
+
+![QE against the exact variance transition](images/qe-transition.png)
+
+**The moment strip and the wings it implies** - Moment explosion through time, and Lee's wing slopes.
+
+![The moment strip and the wings it implies](images/moment-explosion.png)
+
+**Heston calibrated to the S&P 500** - Smiles from a month to two years against the bid-ask, and where five parameters fall short.
+
+![Heston calibrated to the S&P 500](images/heston-calibration.png)
+
+**What the S&P 500 surface pins down** - Multistart, the profile in kappa, and the least determined direction of the Jacobian.
+
+![What the S&P 500 surface pins down](images/heston-identifiability.png)

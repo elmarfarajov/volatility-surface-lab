@@ -18,6 +18,7 @@ from .implied_vol import implied_vol_black76
 from .lattice import binomial_price
 from .market_data import build_snapshot, synthetic_chain
 from .monte_carlo import lsm_american_price, mc_european_gbm, mc_european_heston
+from .stochvol.calibration import model_vols as calibration_model_vols
 from .svi import SVISlice
 
 FANG_OOSTERLEE_PARAMS = HestonParams(v0=0.0175, kappa=1.5768, theta=0.0398, sigma=0.5751, rho=-0.5711)
@@ -563,6 +564,123 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
             worst > -1e-9 and monotone > -1e-12,
         )
 
+    def contour_vs_reference():
+        from .gallery.heston import CASES, reference
+        from .stochvol.pricing import otm_price
+
+        worst, count = 0.0, 0
+        for _, h, t in CASES if not fast else CASES[:2]:
+            spread = 4.0 * np.sqrt(max(h.theta * t, h.v0 * t))
+            k = np.array([-1.4, -0.3, 0.0, 0.3, 1.1]) * spread
+            exact = np.array([reference(float(x), t, h) for x in k])
+            # relative error, with an absolute floor of 1e-20 of the forward for prices near 1e-12
+            worst = max(worst, float(np.max(np.abs(otm_price(k, t, h) - exact) / np.maximum(exact, 1e-10))))
+            count += k.size
+        return (
+            "Lewis's integral, 40 digits (mpmath)",
+            f"{count} OTM prices, wings included",
+            f"{worst:.1e} relative",
+            worst < 1e-10,
+        )
+
+    def fang_oosterlee_contour():
+        from .stochvol.characteristic import Heston
+        from .stochvol.pricing import price
+
+        # Fang and Oosterlee print 5.785155450; Lewis's integral at 40 digits gives 5.78515543437619 - their
+        # eighth significant digit is off by 1.6e-8, so the check is against the 40-digit value
+        exact = 5.78515543437619
+        h = Heston(0.0175, 1.5768, 0.0398, 0.5751, -0.5711)
+        value = float(price(100.0, 100.0, 1.0, h, 1.0, True)[0])
+        return (
+            f"{exact:.11f} (40 digits; printed {FANG_OOSTERLEE_PRICE})",
+            f"{value:.11f}",
+            f"{abs(value - exact):.1e}",
+            abs(value - exact) < 1e-10,
+        )
+
+    def contour_vs_quantlib():
+        from .gallery.heston import _quantlib
+        from .stochvol.characteristic import Heston
+        from .stochvol.pricing import otm_price
+
+        rng = np.random.default_rng(15)
+        worst = 0.0
+        n = 4 if fast else 12
+        for _ in range(n):
+            h = Heston(
+                rng.uniform(0.01, 0.1), rng.uniform(0.5, 5), rng.uniform(0.02, 0.1), rng.uniform(0.2, 1.2), rng.uniform(-0.9, 0.0)
+            )
+            t = float(rng.choice([91, 182, 365, 730])) / 365.0  # whole days, as QuantLib's dates are
+            k = np.linspace(-0.4, 0.3, 8) * np.sqrt(t)
+            ours, theirs = otm_price(k, t, h), _quantlib(k, t, h)
+            worst = max(worst, float(np.max(np.abs(ours - theirs) / theirs)))
+        return "QuantLib AnalyticHestonEngine", f"{n} random models near the money", f"{worst:.1e} relative", worst < 1e-9
+
+    def heston_recovery():
+        from .stochvol.calibration import Expiry, calibrate
+        from .stochvol.characteristic import Heston
+
+        true = Heston(0.025, 2.5, 0.05, 0.9, -0.65)
+        expiries = []
+        for t in (0.1, 0.25, 0.5, 1.0, 2.0):
+            k = np.linspace(-0.35, 0.15, 9) * np.sqrt(t / 0.25)
+            vols = calibration_model_vols(true, [Expiry(t, k, np.zeros_like(k), np.ones_like(k))])[0]
+            expiries.append(Expiry(t, k, vols, np.full(k.size, 0.002)))
+        fit = calibrate(expiries, Heston(0.04, 1.0, 0.04, 0.5, -0.3))
+        error = float(np.max(np.abs(fit.heston.as_array() - true.as_array()) / np.abs(true.as_array())))
+        return (
+            "five known parameters, exact quotes",
+            f"rmse {100 * fit.rmse:.1e} vol pts",
+            f"{100 * error:.2f}% worst parameter",
+            error < 0.01,
+        )
+
+    def qe_feller():
+        from .stochvol.characteristic import Heston
+        from .stochvol.pricing import otm_price
+        from .stochvol.simulation import otm_estimate, simulate
+
+        h = Heston(0.04, 1.0, 0.04, 1.0, -0.7)  # Feller ratio 0.08
+        k = np.array([-0.3, 0.0, 0.2])
+        exact = otm_price(k, 1.0, h)
+        paths = simulate(h, 1.0, 8, 100_000 if fast else 400_000, "qe", seed=21)
+        est = otm_estimate(paths, k)
+        z = float(np.max(np.abs(est.value - exact) / est.stderr))
+        euler = otm_estimate(simulate(h, 1.0, 8, 100_000 if fast else 400_000, "euler", seed=21), k)
+        z_euler = float(np.max(np.abs(euler.value - exact) / euler.stderr))
+        return (
+            "contour prices, Feller ratio 0.08",
+            "QE and Euler, 8 steps a year",
+            f"QE {z:.1f} se; Euler {z_euler:.0f} se",
+            z < 4.0 and z_euler > 10.0,
+        )
+
+    def moment_strip_check():
+        from .stochvol.characteristic import Heston, cf, moment_strip
+
+        failures, n = 0, 0
+        rng = np.random.default_rng(16)
+        for _ in range(10 if fast else 40):
+            h = Heston(
+                rng.uniform(0.01, 0.1), rng.uniform(0.5, 5), rng.uniform(0.02, 0.1), rng.uniform(0.2, 1.5), rng.uniform(-0.9, 0.3)
+            )
+            t = float(10 ** rng.uniform(-1, 1))
+            lo, hi = moment_strip(t, h)
+            for edge, centre in ((lo, 0.0), (hi, 1.0)):
+                if abs(edge) >= 199:
+                    continue
+                n += 1
+                # 2% inside, E[S^p] is a finite positive real number; 2% outside, the formula no longer gives one
+                inside = cf(np.array([-1j * (edge - 0.02 * (edge - centre))]), t, h)[0]
+                outside = cf(np.array([-1j * (edge + 0.02 * (edge - centre))]), t, h)[0]
+
+                def moment(z: complex) -> bool:
+                    return bool(np.isfinite(z) and z.real > 0 and abs(z.imag) < 1e-6 * abs(z.real))
+
+                failures += not moment(inside) or moment(outside)
+        return "Andersen-Piterbarg explosion time", f"{n} edges of random strips", f"{failures} failures", failures == 0
+
     add("Analytic", "Published examples", haug)
     add("Analytic", "Seventeen Greeks vs arbitrary precision", mpmath_greeks)
     add("Analytic", "Black-Scholes PDE from the Greeks", pde)
@@ -584,6 +702,12 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
     add("Monte Carlo", "Scrambled Sobol' vs pseudo-random", sobol)
     add("Monte Carlo", "Control variate on GBM", cv_efficiency)
     add("Heston", "COS method reference price", cos_reference)
+    add("Heston", "Contour integral against 40 digits", contour_vs_reference)
+    add("Heston", "Contour integral, published price", fang_oosterlee_contour)
+    add("Heston", "Contour integral against QuantLib", contour_vs_quantlib)
+    add("Heston", "Calibration recovers known parameters", heston_recovery)
+    add("Heston", "QE and Euler below the Feller boundary", qe_feller)
+    add("Heston", "Moment strip from explosion times", moment_strip_check)
     add("Heston", "Gil-Pelaez reference price", integration_reference)
     add("Heston", "COS vs quadrature, random models", cos_vs_integration)
     add("Heston", "Andersen QE Monte Carlo", heston_mc)

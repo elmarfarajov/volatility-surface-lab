@@ -12,3 +12,5 @@ reports/
 .vscode/
 .idea/
 data/
+*.prof
+prof.out

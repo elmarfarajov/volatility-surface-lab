@@ -21,7 +21,9 @@ VOGT = RawSVI(-0.0410, 0.1331, 0.3060, 0.3586, 0.4153)
     sigma=st.floats(0.02, 1.0),
 )
 def test_natural_and_jump_wings_round_trips(a, b, rho, m, sigma):
-    assume(abs(m) > 1e-3 or abs(rho) > 1e-3)  # with the minimum at the money, jump-wings cannot see sigma
+    # near a symmetric slice with its minimum at the money, jump-wings barely see sigma: the inverse loses digits
+    # (2e-9 at rho = m/sigma = 0.1, 5e-5 at 0.015) and fails outright at 0.005 - documented in JumpWings.raw
+    assume(abs(rho) >= 0.05 or abs(m) / sigma >= 0.05)
     s = RawSVI(a, b, rho, m, sigma)
     k = np.linspace(-2, 2, 41)
     np.testing.assert_allclose(s.natural().raw().total_variance(k), s.total_variance(k), rtol=1e-10, atol=1e-12)

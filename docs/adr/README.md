@@ -16,3 +16,6 @@
 | [0012](0012-no-arbitrage-conditions-are-constraints-checked-on-the-whole-line.md) | No-arbitrage conditions are hard constraints, checked on the whole real line | Accepted |
 | [0013](0013-between-expiries-prices-are-interpolated.md) | Between expiries prices are interpolated, and beyond the last the distribution is convolved | Accepted |
 | [0014](0014-ssvi-and-essvi-are-kept-as-arbitrage-free-starts.md) | SSVI and eSSVI are kept as arbitrage-free starting points, not as the fitted surface | Accepted |
+| [0015](0015-heston-prices-out-of-the-money-by-contour-integral.md) | Heston prices out of the money by a contour integral, held to a 40-digit reference | Accepted |
+| [0016](0016-the-moment-strip-comes-from-explosion-times.md) | The moment strip comes from explosion times, and closed forms are re-derived, not recalled | Accepted |
+| [0017](0017-heston-calibration-reports-its-identifiability-and-simulation-uses-qe.md) | Heston calibration reports what it can identify, and simulation uses QE | Accepted |

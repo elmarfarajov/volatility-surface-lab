@@ -17,8 +17,8 @@ real market data, or properties that must hold for any input.
 | 2 | Numerical engines: lattices, finite differences and Monte Carlo against high-precision references | #2 | v1.2.0 | ✅ Done |
 | 3 | Implied volatility and the market: robust inversion, forward extraction, real option chains | #3 | v1.3.0 | ✅ Done |
 | 4 | The arbitrage-free surface: SVI and SSVI, calendar and butterfly conditions, wings and densities | #4 | v1.4.0 | ✅ Done |
-| 5 | Heston: characteristic functions, Fourier pricing, calibration and simulation | #5 | v1.5.0 | Next |
-| 6 | Local volatility and SABR: Dupire in implied-volatility form, Hagan and its corrections | #6 | v1.6.0 | |
+| 5 | Heston: characteristic functions, Fourier pricing, calibration and simulation | #5 | v1.5.0 | ✅ Done |
+| 6 | Local volatility and SABR: Dupire in implied-volatility form, Hagan and its corrections | #6 | v1.6.0 | Next |
 | 7 | Exotic options: barriers, Asians, lookbacks and digitals, analytic against simulation | #7 | v1.7.0 | |
 | 8 | Hedging and model risk: Greeks P&L explain, discrete hedging, the book's risk | #8 | v1.8.0 | |
 | 9 | The platform: CLI, dashboard, reproducible reports and packaging | #9 | v1.9.0 | |
@@ -113,3 +113,23 @@ real market data, or properties that must hold for any input.
   2e-16.
 
 **Notes:** [the arbitrage-free surface](notes/the-arbitrage-free-surface.md).
+
+## Day 5 - Heston ✅
+
+**Issue #5, release v1.5.0.**
+
+- **Prices to the last digit.** A contour integral prices each side out of the money,
+  with a graded quadrature and the damping kept inside the moment strip. It is within
+  1e-14 of Lewis's integral at 40 digits in both wings. The v1.0 COS and Gil-Pelaez engines
+  were 47% and 110% wrong for a deep ten-year call.
+- **A published value corrected.** Fang and Oosterlee's printed reference price,
+  5.785155450, is off by 1.6e-8; the 40-digit value is 5.78515543437619.
+- **The moment strip** comes from Andersen and Piterbarg's explosion time, derived from the
+  Riccati equation. Testing where the characteristic function stops being real fails,
+  because its continuation turns real again beyond the explosion.
+- **Calibrated to the S&P 500**, with its identifiability measured. Every start reaches the
+  same minimum, but `kappa` is fixed only to about a factor of two, and the fit misses by
+  2.5 vol points. **Simulated** with QE, which is within noise where Euler is a hundred
+  standard errors out.
+
+**Notes:** [Heston](notes/heston.md).
