@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)
 ![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
-[![Release](https://img.shields.io/badge/release-v1.5.0-e0632b)](https://github.com/elmarfarajov/volatility-surface-lab/releases)
+[![Release](https://img.shields.io/badge/release-v1.6.0-e0632b)](https://github.com/elmarfarajov/volatility-surface-lab/releases)
 ![mypy](https://img.shields.io/badge/mypy-strict-1b9e77)
 ![Validated](https://img.shields.io/badge/validated-QuantLib%20%7C%20mpmath%20%7C%20Haug-2f6fdb)
 
@@ -37,8 +37,8 @@ the charts in the [gallery](docs/GALLERY.md), and the decisions in the
 | 3 | Implied volatility and real option chains: an exact inverse, parity forwards, clean quotes | ✅ v1.3.0 |
 | 4 | The arbitrage-free surface: SVI under hard constraints, price interpolation, densities | ✅ v1.4.0 |
 | 5 | Heston: prices to the last digit, identifiable calibration, QE simulation | ✅ v1.5.0 |
-| 6 | Local volatility and SABR | next |
-| 7 | Exotic options | |
+| 6 | Local volatility and SABR: closed-form Dupire, Hagan against the model, smile dynamics | ✅ v1.6.0 |
+| 7 | Exotic options | next |
 | 8 | Hedging and model risk | |
 | 9 | The platform | |
 
@@ -130,6 +130,22 @@ The full account is in [the arbitrage-free surface](docs/notes/the-arbitrage-fre
 
 The full account is in [Heston](docs/notes/heston.md).
 
+**Day 6: local volatility and SABR.**
+
+- **Local volatility in closed form**, from the arbitrage-free surface, and repriced by the
+  forward Dupire equation to within a few basis points. On the way: the Day 4 interpolation
+  keeps an atom before its first expiry, which no diffusion can carry.
+- **SABR held to the model.** Against an exact reference, Hagan's formula is off by 4 bp at
+  five weeks and over 400 bp at two years, and at long maturities it implies negative
+  densities.
+- **Smile dynamics, measured.** Local volatility moves the at-the-money volatility against
+  the index by twice the skew, and SABR moves it with the index. The same smile gives
+  at-the-money deltas from 0.39 to 0.63.
+
+![Same smile today, different smiles tomorrow](docs/images/smile-dynamics.png)
+
+The full account is in [local volatility and SABR](docs/notes/local-volatility-and-sabr.md).
+
 ## Results on live S&P 500 options
 
 Snapshot: `^SPX`, Yahoo Finance (delayed), 16 September 2026, spot 7,611.77, **10 expiries from one week to one
@@ -216,6 +232,7 @@ flowchart LR
 | `market/` | The Black function through the Mills ratio; Jaeckel-style implied volatility, exact to its conditioning; forwards and discount curve from parity; chain snapshots and cleaning with stated reasons |
 | `smile/` | SVI in three parameterisations with whole-line arbitrage checks; SSVI and eSSVI; raw SVI under hard constraints; price interpolation in time; risk-neutral densities |
 | `stochvol/` | Heston: the characteristic function and its moment strip; out-of-the-money prices by contour integral; calibration with identifiability diagnostics; Euler and QE simulation |
+| `localvol/` | Dupire local volatility in closed form and the forward equation that checks it; SABR with an exact reference; smile dynamics and deltas |
 | `implied_vol.py` | The original modules' entry points to the implied-volatility inversion in `market/` |
 | `lattice.py` | Leisen-Reimer and Cox-Ross-Rubinstein trees, European and American exercise |
 | `monte_carlo.py` | GBM with antithetic sampling and control variates; Heston QE scheme with martingale correction; Longstaff-Schwartz |
@@ -225,7 +242,7 @@ flowchart LR
 | `surface.py` | Monotone total-variance interpolation, Dupire local volatility, calendar diagnostics |
 | `calibration.py` | Vega-scaled least squares, market-informed multistart or differential evolution, exact-IV residual reporting |
 | `hedging.py` | Discrete delta-hedging P&L in Black-Scholes and Heston worlds for three hedge ratios |
-| `validation.py` | 39 checks against published benchmarks and independent methods |
+| `validation.py` | 43 checks against published benchmarks and independent methods |
 | `report.py`, `figures.py` | Self-contained HTML report with an interactive 3D surface; publication-style figures |
 | `gallery/` | The documentation's charts, registered by day and redrawn with `volsurf gallery` |
 | `app/streamlit_app.py` | Interactive dashboard: pricing lab, surface explorer, calibration and hedging lab |

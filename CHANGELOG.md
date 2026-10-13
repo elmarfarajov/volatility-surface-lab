@@ -4,6 +4,48 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-10-13
+
+Day 6: local volatility and SABR. Dupire in closed form from the arbitrage-free surface,
+Hagan's expansion against the model it approximates, and the smile dynamics, and deltas,
+each model implies.
+
+### Added
+
+- **`volsurf.localvol.dupire`**:
+  - local variance in closed form from the Day 4 price interpolation, positive by
+    construction, with a self-similar short end before the first expiry;
+  - a forward Dupire solver (Crank-Nicolson after Rannacher steps) that reprices the
+    surface.
+- **`volsurf.localvol.sabr`**:
+  - Hagan's lognormal formula and Obloj's correction;
+  - an exact conditional Monte Carlo reference for `beta = 1`;
+  - Breeden-Litzenberger densities;
+  - calibration at fixed `beta`.
+- **`volsurf.localvol.dynamics`**: the smile after the index moves, under frozen local
+  volatility and under SABR, and Black, local-volatility, SABR and Bartlett deltas.
+- **Tests:**
+  - a flat surface;
+  - the forward-equation round trip;
+  - Hagan against QuantLib, and the reference against QuantLib's SABR PDE;
+  - negative densities and calibration;
+  - the factor-of-two smile dynamics.
+- **Six charts**, a methodology note, and ADRs 0018 to 0020.
+- **Four rows in `volsurf validate`**: the Dupire round trip, local-volatility smile
+  dynamics, Hagan against QuantLib, and the exact reference against QuantLib's PDE.
+
+### Found
+
+- **The Day 4 price interpolation keeps an atom at the forward before the first expiry.**
+  No diffusion can carry it, so a forward Dupire solve from expiry stopped converging. The
+  local-volatility short end is now self-similar.
+- **Between expiries, the price interpolation of a flat surface has a smile**, 2.8 points
+  at `ln(K/F) = -0.4`. It is free of arbitrage, but not minimal.
+- **Local volatility from daily weeklies is noise in the wings**, swinging from 8% to over
+  200% within two weeks.
+- **The v1.0 `VolSurface.local_vol` returned NaN on 4% of the S&P 500 grid.**
+  `volsurf analyze` still uses it until the Day 9 platform work.
+
 ## [1.5.0] - 2026-10-11
 
 Day 5: Heston. Prices to the last digit in both wings, a published reference corrected,
