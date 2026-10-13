@@ -147,3 +147,29 @@ Every chart is rebuilt from source with `volsurf gallery`. The figures of the li
 **What the S&P 500 surface pins down** - Multistart, the profile in kappa, and the least determined direction of the Jacobian.
 
 ![What the S&P 500 surface pins down](images/heston-identifiability.png)
+
+## Day 6: Local volatility and SABR
+
+**S&P 500 local volatility in closed form** - Local against implied volatility, the term structure, and the noise daily weeklies bring to the wings.
+
+![S&P 500 local volatility in closed form](images/local-vol-surface.png)
+
+**Repricing the surface from its own local volatility** - The forward Dupire equation against the surface, as the grid is refined.
+
+![Repricing the surface from its own local volatility](images/dupire-round-trip.png)
+
+**Hagan's SABR formula against the model** - The expansion against an exact conditional reference, by strike and by nu^2 T.
+
+![Hagan's SABR formula against the model](images/sabr-accuracy.png)
+
+**Where Hagan's formula stops being a model** - Negative densities and the model's own prices from QuantLib's SABR PDE.
+
+![Where Hagan's formula stops being a model](images/sabr-density.png)
+
+**SABR fitted to each S&P 500 expiry** - Parameters by maturity, and the fit against SVI.
+
+![SABR fitted to each S&P 500 expiry](images/sabr-spx.png)
+
+**Same smile today, different smiles tomorrow** - The smile after the index moves, under local volatility and SABR, and the deltas.
+
+![Same smile today, different smiles tomorrow](images/smile-dynamics.png)
