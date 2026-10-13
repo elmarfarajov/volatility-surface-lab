@@ -18,8 +18,8 @@ real market data, or properties that must hold for any input.
 | 3 | Implied volatility and the market: robust inversion, forward extraction, real option chains | #3 | v1.3.0 | ✅ Done |
 | 4 | The arbitrage-free surface: SVI and SSVI, calendar and butterfly conditions, wings and densities | #4 | v1.4.0 | ✅ Done |
 | 5 | Heston: characteristic functions, Fourier pricing, calibration and simulation | #5 | v1.5.0 | ✅ Done |
-| 6 | Local volatility and SABR: Dupire in implied-volatility form, Hagan and its corrections | #6 | v1.6.0 | Next |
-| 7 | Exotic options: barriers, Asians, lookbacks and digitals, analytic against simulation | #7 | v1.7.0 | |
+| 6 | Local volatility and SABR: Dupire in implied-volatility form, Hagan and its corrections | #6 | v1.6.0 | ✅ Done |
+| 7 | Exotic options: barriers, Asians, lookbacks and digitals, analytic against simulation | #7 | v1.7.0 | Next |
 | 8 | Hedging and model risk: Greeks P&L explain, discrete hedging, the book's risk | #8 | v1.8.0 | |
 | 9 | The platform: CLI, dashboard, reproducible reports and packaging | #9 | v1.9.0 | |
 
@@ -133,3 +133,22 @@ real market data, or properties that must hold for any input.
   standard errors out.
 
 **Notes:** [Heston](notes/heston.md).
+
+## Day 6 - local volatility and SABR ✅
+
+**Issue #6, release v1.6.0.**
+
+- **Local volatility in closed form.** It comes from the Day 4 price interpolation and is
+  positive by construction; the v1.0 finite differences gave NaN on 4% of the grid. The
+  forward Dupire equation reprices the monthly surface to within a few basis points.
+- **What the interpolation hides.** It has an atom before the first expiry, which no
+  diffusion carries; it puts a smile between flat expiries; and daily weeklies turn the
+  local-volatility wings to noise. All three are measured and stated.
+- **SABR held to the model.** An exact conditional reference, cross-checked with QuantLib's
+  SABR PDE, shows Hagan's error growing from 4 bp to over 400 bp with `nu^2 T`. Its density
+  turns negative at low strikes for long maturities.
+- **Smile dynamics measured.** Local volatility moves the at-the-money volatility by 1.98
+  to 2.2 times the skew against the index, while SABR moves it with the index. The
+  at-the-money deltas range from 0.39 to 0.63.
+
+**Notes:** [local volatility and SABR](notes/local-volatility-and-sabr.md).

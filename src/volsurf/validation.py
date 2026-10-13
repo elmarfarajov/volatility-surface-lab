@@ -681,6 +681,109 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
                 failures += not moment(inside) or moment(outside)
         return "Andersen-Piterbarg explosion time", f"{n} edges of random strips", f"{failures} failures", failures == 0
 
+    def _heston_surface_monthly():
+        from datetime import datetime, timezone
+
+        from .market.chains import Chain
+        from .market.cleaning import prepare
+        from .smile.build import build_surface
+
+        if "monthly" not in cache:
+            params = HestonParams(v0=0.03, kappa=2.0, theta=0.04, sigma=0.6, rho=-0.7)
+            raw = synthetic_chain(params, spot=5000.0, rate=0.04, dividend_yield=0.013, maturities_days=(30, 72, 170, 352))
+            quotes = raw.assign(root="SYN", is_call=raw["option_type"].eq("C"), last_trade=pd.Timestamp("2026-10-09", tz="UTC"))
+            chain = Chain("SYN", 5000.0, datetime(2026, 10, 9, 20, tzinfo=timezone.utc), quotes.assign(vendor_iv=np.nan))
+            cache["monthly"] = build_surface(prepare(chain)).surface
+        return cache["monthly"]
+
+    def dupire_round_trip():
+        from .localvol.dupire import implied_from_calls, local_variance, solve_forward
+
+        surface = _heston_surface_monthly()
+        targets = surface.maturities[1:]
+        nx, nt = (1200, 500) if fast else (2400, 1000)
+        sol = solve_forward(lambda k, t: local_variance(surface, k, t), targets, space_steps=nx, steps_per_year=nt)
+        worst = 0.0
+        for i, t in enumerate(targets):
+            theta = float(surface.thetas[i + 1])
+            sel = (sol.k > -3 * np.sqrt(theta)) & (sol.k < 1.2 * np.sqrt(theta))
+            error = implied_from_calls(sol.k[sel], sol.calls[i][sel], float(t)) - surface.implied_vol(sol.k[sel], float(t))
+            worst = max(worst, float(np.nanmax(np.abs(error))))
+        return (
+            "the surface's own implied volatilities",
+            f"forward Dupire PDE, {nx} x {nt}/yr, from t = 0",
+            f"{1e4 * worst:.1f} bp",
+            worst < 6e-4,
+        )
+
+    def hagan_quantlib():
+        import QuantLib as ql
+
+        from .localvol.sabr import SABR, hagan_vol
+
+        rng = np.random.default_rng(17)
+        worst = 0.0
+        for _ in range(30 if fast else 200):
+            p = SABR(rng.uniform(0.05, 0.5), float(rng.choice([0.0, 0.5, 1.0])), rng.uniform(-0.9, 0.9), rng.uniform(0.05, 2.0))
+            f, t = rng.uniform(0.01, 2.0), rng.uniform(0.05, 5)
+            k = f * np.exp(np.linspace(-0.5, 0.5, 11))
+            theirs = np.array([ql.sabrVolatility(float(x), float(f), float(t), p.alpha, p.beta, p.nu, p.rho) for x in k])
+            worst = max(worst, float(np.max(np.abs(hagan_vol(f, k, t, p) - theirs) / theirs)))
+        return "QuantLib sabrVolatility", "random parameters, eleven strikes", f"{worst:.1e} relative", worst < 1e-12
+
+    def sabr_reference():
+        import QuantLib as ql
+
+        from .localvol.sabr import SABR, hagan_vol, reference_vols
+        from .market.implied import implied_vol
+
+        p = SABR(0.2, 1.0, -0.7, 1.0)
+        days = 183
+        t = days / 365
+        k = np.exp(np.array([-0.3, 0.0, 0.15]))
+        ref = reference_vols(1.0, k, t, p, paths=100_000 if fast else 400_000, steps=200, seed=4)
+        today = ql.Date(13, 10, 2026)
+        ql.Settings.instance().evaluationDate = today
+        flat = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.0, ql.Actual365Fixed()))
+        engine = ql.FdSabrVanillaEngine(1.0, p.alpha, 0.999, p.nu, p.rho, flat, 200, 400, 100, 1, 0.8)
+        prices = []
+        for x in k:
+            option = ql.VanillaOption(
+                ql.PlainVanillaPayoff(ql.Option.Call if x >= 1 else ql.Option.Put, float(x)), ql.EuropeanExercise(today + days)
+            )
+            option.setPricingEngine(engine)
+            prices.append(option.NPV())
+        fd = implied_vol(np.array(prices), 1.0, k, t, 1.0, k >= 1)
+        gap = float(np.max(np.abs(fd - ref.vols)))
+        hagan = float(np.max(np.abs(hagan_vol(1.0, k, t, p) - ref.vols)))
+        return (
+            "QuantLib SABR PDE (beta 0.999)",
+            f"conditional MC, beta 1; Hagan off by {1e4 * hagan:.0f} bp",
+            f"{1e4 * gap:.1f} bp (MC se {1e4 * float(ref.stderr.max()):.1f})",
+            gap < 4 * float(ref.stderr.max()) + 5e-4,
+        )
+
+    def lv_backbone():
+        from .localvol.dynamics import smile_moves
+        from .localvol.sabr import calibrate
+
+        surface = _heston_surface_monthly()
+        t = float(surface.maturities[1])
+        k = np.log(np.linspace(0.85, 1.1, 26))
+        sabr = calibrate(1.0, np.exp(k), t, surface.implied_vol(k, t)).params
+        shifts = np.log(np.array([0.97, 1.0, 1.03]))
+        strikes = np.exp(np.linspace(-0.08, 0.06, 29))
+        move = smile_moves(surface, sabr, t, shifts, strikes, space_steps=1200)
+        atm = [np.interp(np.exp(x), strikes, row) for x, row in zip(shifts, move.local_vol, strict=True)]
+        skew = float((surface.implied_vol(np.array([0.01]), t) - surface.implied_vol(np.array([-0.01]), t))[0] / 0.02)
+        ratio = float(np.polyfit(shifts, atm, 1)[0] / skew)
+        return (
+            "about twice the skew (Hagan et al. 2002)",
+            "ATM vol per log-move under local vol",
+            f"{ratio:.2f} x skew",
+            1.5 < ratio < 2.8,
+        )
+
     add("Analytic", "Published examples", haug)
     add("Analytic", "Seventeen Greeks vs arbitrary precision", mpmath_greeks)
     add("Analytic", "Black-Scholes PDE from the Greeks", pde)
@@ -712,6 +815,10 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
     add("Heston", "COS vs quadrature, random models", cos_vs_integration)
     add("Heston", "Andersen QE Monte Carlo", heston_mc)
     add("Heston", "COS delta and variance sensitivity", heston_greeks)
+    add("Local vol", "Dupire round trip on a Heston surface", dupire_round_trip)
+    add("Local vol", "Smile moves against the index", lv_backbone)
+    add("SABR", "Hagan against QuantLib", hagan_quantlib)
+    add("SABR", "Exact reference against QuantLib's PDE", sabr_reference)
     add("SVI", "Butterfly-arbitrage detection", svi_vogt)
     add("Surface", "Vogt's slice found and repaired", vogt_repair)
     add("Surface", "SSVI theorem, checked on the whole line", ssvi_theorem)

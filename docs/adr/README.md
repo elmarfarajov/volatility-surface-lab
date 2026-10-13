@@ -19,3 +19,6 @@
 | [0015](0015-heston-prices-out-of-the-money-by-contour-integral.md) | Heston prices out of the money by a contour integral, held to a 40-digit reference | Accepted |
 | [0016](0016-the-moment-strip-comes-from-explosion-times.md) | The moment strip comes from explosion times, and closed forms are re-derived, not recalled | Accepted |
 | [0017](0017-heston-calibration-reports-its-identifiability-and-simulation-uses-qe.md) | Heston calibration reports what it can identify, and simulation uses QE | Accepted |
+| [0018](0018-local-volatility-in-closed-form-from-the-price-interpolation.md) | Local volatility comes in closed form from the price interpolation, with a self-similar short end | Accepted |
+| [0019](0019-sabr-is-held-to-an-exact-reference.md) | SABR's expansion is held to an exact reference, not to itself | Accepted |
+| [0020](0020-smile-dynamics-are-computed-in-each-model.md) | Smile dynamics are computed inside each model, and the delta follows | Accepted |

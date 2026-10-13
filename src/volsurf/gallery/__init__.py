@@ -13,7 +13,7 @@ from pathlib import Path
 
 from matplotlib.figure import Figure
 
-from . import analytic, heston, market, numerics, smiles
+from . import analytic, heston, localvol, market, numerics, smiles
 from .style import save
 
 DAYS: dict[int, str] = {
@@ -22,6 +22,7 @@ DAYS: dict[int, str] = {
     3: "Implied volatility and the market",
     4: "The arbitrage-free surface",
     5: "Heston",
+    6: "Local volatility and SABR",
 }
 
 
@@ -289,6 +290,52 @@ def items() -> tuple[Item, ...]:
             "Multistart, the profile in kappa, and the least determined direction of the Jacobian.",
             heston.heston_identifiability,
             5,
+            "snapshot",
+        ),
+        Item(
+            "local-vol-surface.png",
+            "S&P 500 local volatility in closed form",
+            "Local against implied volatility, the term structure, and the noise daily weeklies bring to the wings.",
+            localvol.local_vol_surface,
+            6,
+            "snapshot",
+        ),
+        Item(
+            "dupire-round-trip.png",
+            "Repricing the surface from its own local volatility",
+            "The forward Dupire equation against the surface, as the grid is refined.",
+            localvol.dupire_round_trip,
+            6,
+            "snapshot",
+        ),
+        Item(
+            "sabr-accuracy.png",
+            "Hagan's SABR formula against the model",
+            "The expansion against an exact conditional reference, by strike and by nu^2 T.",
+            localvol.sabr_accuracy,
+            6,
+        ),
+        Item(
+            "sabr-density.png",
+            "Where Hagan's formula stops being a model",
+            "Negative densities and the model's own prices from QuantLib's SABR PDE.",
+            localvol.sabr_density,
+            6,
+        ),
+        Item(
+            "sabr-spx.png",
+            "SABR fitted to each S&P 500 expiry",
+            "Parameters by maturity, and the fit against SVI.",
+            localvol.sabr_spx,
+            6,
+            "snapshot",
+        ),
+        Item(
+            "smile-dynamics.png",
+            "Same smile today, different smiles tomorrow",
+            "The smile after the index moves, under local volatility and SABR, and the deltas.",
+            localvol.smile_dynamics,
+            6,
             "snapshot",
         ),
     )
