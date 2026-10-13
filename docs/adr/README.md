@@ -22,3 +22,7 @@
 | [0018](0018-local-volatility-in-closed-form-from-the-price-interpolation.md) | Local volatility comes in closed form from the price interpolation, with a self-similar short end | Accepted |
 | [0019](0019-sabr-is-held-to-an-exact-reference.md) | SABR's expansion is held to an exact reference, not to itself | Accepted |
 | [0020](0020-smile-dynamics-are-computed-in-each-model.md) | Smile dynamics are computed inside each model, and the delta follows | Accepted |
+| [0021](0021-exotic-closed-forms-are-held-to-quantlib-and-monte-carlo-to-them.md) | Exotic closed forms are held to QuantLib, and Monte Carlo is held to the closed forms | Accepted |
+| [0022](0022-discrete-monitoring-is-priced-on-its-own-grid.md) | Discrete monitoring is priced on its own grid; the continuity correction is checked, not assumed | Accepted |
+| [0023](0023-the-arithmetic-asian-reference-is-controlled-monte-carlo.md) | The arithmetic Asian reference is Monte Carlo with the geometric control, not an analytic engine | Accepted |
+| [0024](0024-exotics-are-priced-under-every-model-of-the-surface.md) | Exotics are priced under every model of the surface, and the spread is reported | Accepted |

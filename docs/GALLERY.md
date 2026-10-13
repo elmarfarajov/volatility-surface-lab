@@ -173,3 +173,26 @@ Every chart is rebuilt from source with `volsurf gallery`. The figures of the li
 **Same smile today, different smiles tomorrow** - The smile after the index moves, under local volatility and SABR, and the deltas.
 
 ![Same smile today, different smiles tomorrow](images/smile-dynamics.png)
+
+## Day 7: Exotic options
+
+**Barriers watched continuously or once a day** - Discrete monitoring by Monte Carlo, the BGK shifted barrier, and the Brownian bridge, against the closed form.
+
+![Barriers watched continuously or once a day](images/barrier-monitoring.png)
+
+**Arithmetic Asians: a control variate, and a reference that is not** - Variance removed by the geometric control, and QuantLib's Choi and Turnbull-Wakeman engines against it.
+
+![Arithmetic Asians: a control variate, and a reference that is not](images/asian-control-variate.png)
+
+**Lookbacks: the extreme seen once a day** - Discrete against continuous lookbacks as monitoring is refined, and the closed forms against volatility.
+
+![Lookbacks: the extreme seen once a day](images/lookback-monitoring.png)
+
+**A digital is a call spread, and the smile prices it** - S&P 500 digital calls from the smile against Black-Scholes at one volatility.
+
+![A digital is a call spread, and the smile prices it](images/digital-smile.png)
+
+**One surface, three models, three prices** - A book of vanillas and exotics under Black-Scholes, Heston and local volatility.
+
+![One surface, three models, three prices](images/exotic-model-risk.png)
+

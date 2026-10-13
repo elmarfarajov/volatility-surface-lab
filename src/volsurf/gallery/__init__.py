@@ -13,7 +13,7 @@ from pathlib import Path
 
 from matplotlib.figure import Figure
 
-from . import analytic, heston, localvol, market, numerics, smiles
+from . import analytic, exotics, heston, localvol, market, numerics, smiles
 from .style import save
 
 DAYS: dict[int, str] = {
@@ -23,6 +23,7 @@ DAYS: dict[int, str] = {
     4: "The arbitrage-free surface",
     5: "Heston",
     6: "Local volatility and SABR",
+    7: "Exotic options",
 }
 
 
@@ -336,6 +337,43 @@ def items() -> tuple[Item, ...]:
             "The smile after the index moves, under local volatility and SABR, and the deltas.",
             localvol.smile_dynamics,
             6,
+            "snapshot",
+        ),
+        Item(
+            "barrier-monitoring.png",
+            "Barriers watched continuously or once a day",
+            "Discrete monitoring by Monte Carlo, the BGK shifted barrier, and the Brownian bridge, against the closed form.",
+            exotics.barrier_monitoring,
+            7,
+        ),
+        Item(
+            "asian-control-variate.png",
+            "Arithmetic Asians: a control variate, and a reference that is not",
+            "Variance removed by the geometric control, and QuantLib's Choi and Turnbull-Wakeman engines against it.",
+            exotics.asians,
+            7,
+        ),
+        Item(
+            "lookback-monitoring.png",
+            "Lookbacks: the extreme seen once a day",
+            "Discrete against continuous lookbacks as monitoring is refined, and the closed forms against volatility.",
+            exotics.lookbacks,
+            7,
+        ),
+        Item(
+            "digital-smile.png",
+            "A digital is a call spread, and the smile prices it",
+            "S&P 500 digital calls from the smile against Black-Scholes at one volatility.",
+            exotics.digital_smile,
+            7,
+            "snapshot",
+        ),
+        Item(
+            "exotic-model-risk.png",
+            "One surface, three models, three prices",
+            "A book of vanillas and exotics under Black-Scholes, Heston and local volatility.",
+            exotics.exotic_model_risk,
+            7,
             "snapshot",
         ),
     )

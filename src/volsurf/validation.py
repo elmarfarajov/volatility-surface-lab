@@ -784,6 +784,131 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
             1.5 < ratio < 2.8,
         )
 
+    def _ql_flat(s: float, r: float, q: float, sigma: float):
+        import QuantLib as ql
+
+        today = ql.Date(14, 10, 2026)
+        ql.Settings.instance().evaluationDate = today
+        dc = ql.Actual365Fixed()
+        process = ql.BlackScholesMertonProcess(
+            ql.QuoteHandle(ql.SimpleQuote(s)),
+            ql.YieldTermStructureHandle(ql.FlatForward(today, q, dc)),
+            ql.YieldTermStructureHandle(ql.FlatForward(today, r, dc)),
+            ql.BlackVolTermStructureHandle(ql.BlackConstantVol(today, ql.NullCalendar(), sigma, dc)),
+        )
+        return today, process
+
+    def exotic_barriers():
+        import QuantLib as ql
+
+        from .exotics import closed_form as cf
+
+        kinds = {
+            "down-in": ql.Barrier.DownIn,
+            "down-out": ql.Barrier.DownOut,
+            "up-in": ql.Barrier.UpIn,
+            "up-out": ql.Barrier.UpOut,
+        }
+        rng = np.random.default_rng(70)
+        worst, n = 0.0, 400
+        for _ in range(n):
+            x, days = float(rng.uniform(70, 130)), int(rng.integers(30, 730))
+            r, q, sigma = float(rng.uniform(0, 0.08)), float(rng.uniform(0, 0.05)), float(rng.uniform(0.1, 0.6))
+            kind = str(rng.choice(list(kinds)))
+            h = float(rng.uniform(60, 99)) if kind.startswith("down") else float(rng.uniform(101, 150))
+            call, rebate = bool(rng.random() < 0.5), float(rng.choice([0.0, 3.0]))
+            today, process = _ql_flat(100.0, r, q, sigma)
+            payoff = ql.PlainVanillaPayoff(ql.Option.Call if call else ql.Option.Put, x)
+            option = ql.BarrierOption(kinds[kind], h, rebate, payoff, ql.EuropeanExercise(today + days))
+            option.setPricingEngine(ql.AnalyticBarrierEngine(process))
+            ours = cf.barrier(kind, 100.0, x, h, days / 365, r, r - q, sigma, call, rebate)  # type: ignore[arg-type]
+            worst = max(worst, abs(ours - option.NPV()))
+        return "QuantLib AnalyticBarrierEngine", f"{n} random barriers, four kinds, rebates", f"{worst:.1e}", worst < 1e-10
+
+    def exotic_asian_lookback():
+        import QuantLib as ql
+
+        from .exotics import closed_form as cf
+
+        rng = np.random.default_rng(71)
+        worst = {"geometric": 0.0, "lookback": 0.0}
+        for _ in range(200):
+            x, days = float(rng.uniform(70, 130)), int(rng.integers(30, 730))
+            r, q, sigma = float(rng.uniform(0, 0.08)), float(rng.uniform(0, 0.05)), float(rng.uniform(0.1, 0.6))
+            call = bool(rng.random() < 0.5)
+            kind = ql.Option.Call if call else ql.Option.Put
+            today, process = _ql_flat(100.0, r, q, sigma)
+            payoff = ql.PlainVanillaPayoff(kind, x)
+            n = int(rng.choice([2, 4, 12, 26]))
+            days -= days % n
+            dates = [today + days * (i + 1) // n for i in range(n)]
+            asian = ql.DiscreteAveragingAsianOption(
+                ql.Average.Geometric, 1.0, 0, dates, payoff, ql.EuropeanExercise(today + days)
+            )
+            asian.setPricingEngine(ql.AnalyticDiscreteGeometricAveragePriceAsianEngine(process))
+            gap = abs(cf.geometric_asian(100.0, x, days / 365, r, r - q, sigma, call, n) - asian.NPV())
+            worst["geometric"] = max(worst["geometric"], gap)
+            if abs(r - q) > 1e-3:
+                extreme = float(rng.uniform(80, 100)) if call else float(rng.uniform(100, 120))
+                floating = ql.ContinuousFloatingLookbackOption(
+                    extreme, ql.FloatingTypePayoff(kind), ql.EuropeanExercise(today + days)
+                )
+                floating.setPricingEngine(ql.AnalyticContinuousFloatingLookbackEngine(process))
+                gap = abs(cf.floating_lookback(100.0, extreme, days / 365, r, r - q, sigma, call) - floating.NPV())
+                worst["lookback"] = max(worst["lookback"], gap)
+        return (
+            "QuantLib geometric Asian and lookback engines",
+            "200 random contracts each",
+            f"Asian {worst['geometric']:.1e}, lookback {worst['lookback']:.1e}",
+            max(worst.values()) < 1e-10,
+        )
+
+    def exotic_bridge():
+        from .exotics import closed_form as cf
+        from .exotics.monte_carlo import barrier_mc
+
+        worst = 0.0
+        for kind, h in (("down-out", 85.0), ("up-out", 120.0)):
+            exact = cf.barrier(kind, 100.0, 100.0, h, 1.0, 0.05, 0.03, 0.25, True)  # type: ignore[arg-type]
+            for m in (12, 52):
+                est = barrier_mc(
+                    kind, 100.0, 100.0, h, 1.0, 0.05, 0.03, 0.25, True, m, 100_000 if fast else 400_000, bridge=True, seed=72
+                )
+                worst = max(worst, abs(est.value - exact) / est.stderr)
+        return "continuous closed form (Reiner-Rubinstein)", "Brownian bridge on 12 and 52 dates", f"{worst:.1f} se", worst < 4
+
+    def exotic_bgk():
+        from .exotics.monte_carlo import barrier_mc, bgk_barrier
+
+        # daily monitoring, where the correction holds; monthly 20% from spot it is 9% high (ADR 0022)
+        rows = []
+        for kind, h in (("down-out", 85.0), ("up-out", 120.0)):
+            est = barrier_mc(kind, 100.0, 100.0, h, 1.0, 0.05, 0.03, 0.25, True, 252, 100_000 if fast else 400_000, seed=73)
+            rows.append(abs(est.value - bgk_barrier(kind, 100.0, 100.0, h, 1.0, 0.05, 0.03, 0.25, True, 252)) / est.stderr)
+        return "discretely monitored Monte Carlo", "BGK shifted barrier, daily, down and up", f"{max(rows):.1f} se", max(rows) < 4
+
+    def exotic_asian_mc():
+        import QuantLib as ql
+
+        from .exotics.monte_carlo import arithmetic_asian
+
+        today, process = _ql_flat(100.0, 0.05, 0.02, 0.25)
+        dates = [today + 7 * (i + 1) for i in range(52)]
+        option = ql.DiscreteAveragingAsianOption(
+            ql.Average.Arithmetic, 0.0, 0, dates, ql.PlainVanillaPayoff(ql.Option.Call, 100.0), ql.EuropeanExercise(today + 364)
+        )
+        engine = ql.MCDiscreteArithmeticAPEngine(process, "pseudorandom", requiredSamples=100_000, controlVariate=True, seed=42)
+        option.setPricingEngine(engine)
+        theirs, their_se = option.NPV(), option.errorEstimate()
+        ours = arithmetic_asian(100.0, 100.0, 364 / 365, 0.05, 0.03, 0.25, 52, True, 100_000 if fast else 400_000, seed=74)
+        z = abs(ours.controlled.value - theirs) / float(np.hypot(ours.controlled.stderr, their_se))
+        return (
+            f"QuantLib MC with control variate {theirs:.4f}",
+            f"{ours.controlled.value:.4f}, variance cut {ours.variance_ratio:.0f}x",
+            f"{z:.1f} se",
+            z < 4,
+        )
+
     add("Analytic", "Published examples", haug)
     add("Analytic", "Seventeen Greeks vs arbitrary precision", mpmath_greeks)
     add("Analytic", "Black-Scholes PDE from the Greeks", pde)
@@ -819,6 +944,11 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
     add("Local vol", "Smile moves against the index", lv_backbone)
     add("SABR", "Hagan against QuantLib", hagan_quantlib)
     add("SABR", "Exact reference against QuantLib's PDE", sabr_reference)
+    add("Exotics", "Reiner-Rubinstein barriers against QuantLib", exotic_barriers)
+    add("Exotics", "Geometric Asians and lookbacks against QuantLib", exotic_asian_lookback)
+    add("Exotics", "Brownian bridge recovers continuous monitoring", exotic_bridge)
+    add("Exotics", "BGK continuity correction", exotic_bgk)
+    add("Exotics", "Arithmetic Asian against QuantLib's Monte Carlo", exotic_asian_mc)
     add("SVI", "Butterfly-arbitrage detection", svi_vogt)
     add("Surface", "Vogt's slice found and repaired", vogt_repair)
     add("Surface", "SSVI theorem, checked on the whole line", ssvi_theorem)

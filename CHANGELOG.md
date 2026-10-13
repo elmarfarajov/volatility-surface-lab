@@ -4,6 +4,50 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-10-13
+
+Day 7: exotic options. Closed forms held to QuantLib, Monte Carlo held to the closed forms,
+and one book of exotics priced under every model of the S&P 500 surface.
+
+### Added
+
+- **`volsurf.exotics.closed_form`**:
+  - Reiner-Rubinstein barriers with rebates;
+  - Kemna-Vorst geometric Asians, continuous and discrete;
+  - Goldman-Sosin-Gatto floating and Conze-Viswanathan fixed lookbacks;
+  - cash- and asset-or-nothing digitals.
+- **`volsurf.exotics.monte_carlo`**:
+  - paths under Black-Scholes, Heston (QE) and local volatility on one interface;
+  - discretely monitored barriers, the Brownian-bridge estimator of continuous monitoring,
+    and Broadie, Glasserman and Kou's continuity correction;
+  - arithmetic Asians with the geometric control variate.
+- **`volsurf.exotics.model_risk`**: a seven-contract book priced under Black-Scholes, Heston
+  and local volatility.
+- **Tests:**
+  - every closed form against QuantLib, and the in-out and digital parities;
+  - the bridge, the correction and where it fails;
+  - the control variate against QuantLib's Monte Carlo;
+  - martingale and repricing checks for each path model, and the book on a Heston surface.
+- **Five charts**, a methodology note, and ADRs 0021 to 0024.
+- **Five rows in `volsurf validate`**: barriers, geometric Asians and lookbacks against
+  QuantLib; the bridge; the continuity correction; the arithmetic Asian against QuantLib's
+  Monte Carlo.
+
+### Found
+
+- **QuantLib's `ChoiAsianEngine` is 0.40% low at 52 fixings**, about 48 standard errors,
+  though converged in its own parameters and right at 4 and 7 fixings. Two independent
+  Monte Carlo engines agree with each other.
+- **The BGK correction overprices an up-and-out call** 20% from spot by 9% monitored
+  monthly and 22% quarterly; it holds daily.
+- **On the S&P 500, Heston and local volatility agree on the at-the-money call to 0.2% but
+  price a 120% up-and-out call 35% apart.**
+
+### Fixed
+
+- **`CITATION.cff`** had its schema version bumped in place of the software version since
+  v1.3.0; it now reads `cff-version: 1.2.0`, `version: 1.7.0`.
+
 ## [1.6.0] - 2026-10-13
 
 Day 6: local volatility and SABR. Dupire in closed form from the arbitrage-free surface,
