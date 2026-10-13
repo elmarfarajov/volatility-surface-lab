@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)
 ![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
-[![Release](https://img.shields.io/badge/release-v1.6.0-e0632b)](https://github.com/elmarfarajov/volatility-surface-lab/releases)
+[![Release](https://img.shields.io/badge/release-v1.7.0-e0632b)](https://github.com/elmarfarajov/volatility-surface-lab/releases)
 ![mypy](https://img.shields.io/badge/mypy-strict-1b9e77)
 ![Validated](https://img.shields.io/badge/validated-QuantLib%20%7C%20mpmath%20%7C%20Haug-2f6fdb)
 
@@ -38,6 +38,7 @@ the charts in the [gallery](docs/GALLERY.md), and the decisions in the
 | 4 | The arbitrage-free surface: SVI under hard constraints, price interpolation, densities | ✅ v1.4.0 |
 | 5 | Heston: prices to the last digit, identifiable calibration, QE simulation | ✅ v1.5.0 |
 | 6 | Local volatility and SABR: closed-form Dupire, Hagan against the model, smile dynamics | ✅ v1.6.0 |
+| 7 | Exotic options: closed forms against QuantLib, corrected Monte Carlo, three models of one surface | ✅ v1.7.0 |
 | 7 | Exotic options | next |
 | 8 | Hedging and model risk | |
 | 9 | The platform | |
@@ -146,6 +147,22 @@ The full account is in [Heston](docs/notes/heston.md).
 
 The full account is in [local volatility and SABR](docs/notes/local-volatility-and-sabr.md).
 
+**Day 7: exotic options.**
+
+- **Closed forms held to QuantLib**: barriers, geometric Asians, lookbacks and digitals,
+  to 1e-12 or better.
+- **Monte Carlo held to the closed forms.** The Brownian bridge recovers continuous
+  monitoring from a monthly grid. The BGK correction holds daily but overprices a near
+  up-and-out by 22% monitored quarterly.
+- **A reference that is not.** QuantLib's Choi Asian engine, converged in its parameters,
+  is 0.40% low at 52 fixings, against two Monte Carlo engines that agree.
+- **One surface, three models.** Heston and local volatility price the S&P 500
+  at-the-money call within 0.2% of each other and a 120% up-and-out call 35% apart.
+
+![One surface, three models, three prices](docs/images/exotic-model-risk.png)
+
+The full account is in [exotic options](docs/notes/exotic-options.md).
+
 ## Results on live S&P 500 options
 
 Snapshot: `^SPX`, Yahoo Finance (delayed), 16 September 2026, spot 7,611.77, **10 expiries from one week to one
@@ -233,6 +250,7 @@ flowchart LR
 | `smile/` | SVI in three parameterisations with whole-line arbitrage checks; SSVI and eSSVI; raw SVI under hard constraints; price interpolation in time; risk-neutral densities |
 | `stochvol/` | Heston: the characteristic function and its moment strip; out-of-the-money prices by contour integral; calibration with identifiability diagnostics; Euler and QE simulation |
 | `localvol/` | Dupire local volatility in closed form and the forward equation that checks it; SABR with an exact reference; smile dynamics and deltas |
+| `exotics/` | Barrier, Asian, lookback and digital closed forms; Monte Carlo under Black-Scholes, Heston and local volatility with the Brownian bridge, BGK and control variates; exotic model risk |
 | `implied_vol.py` | The original modules' entry points to the implied-volatility inversion in `market/` |
 | `lattice.py` | Leisen-Reimer and Cox-Ross-Rubinstein trees, European and American exercise |
 | `monte_carlo.py` | GBM with antithetic sampling and control variates; Heston QE scheme with martingale correction; Longstaff-Schwartz |
@@ -242,7 +260,7 @@ flowchart LR
 | `surface.py` | Monotone total-variance interpolation, Dupire local volatility, calendar diagnostics |
 | `calibration.py` | Vega-scaled least squares, market-informed multistart or differential evolution, exact-IV residual reporting |
 | `hedging.py` | Discrete delta-hedging P&L in Black-Scholes and Heston worlds for three hedge ratios |
-| `validation.py` | 43 checks against published benchmarks and independent methods |
+| `validation.py` | 48 checks against published benchmarks and independent methods |
 | `report.py`, `figures.py` | Self-contained HTML report with an interactive 3D surface; publication-style figures |
 | `gallery/` | The documentation's charts, registered by day and redrawn with `volsurf gallery` |
 | `app/streamlit_app.py` | Interactive dashboard: pricing lab, surface explorer, calibration and hedging lab |

@@ -19,8 +19,8 @@ real market data, or properties that must hold for any input.
 | 4 | The arbitrage-free surface: SVI and SSVI, calendar and butterfly conditions, wings and densities | #4 | v1.4.0 | ✅ Done |
 | 5 | Heston: characteristic functions, Fourier pricing, calibration and simulation | #5 | v1.5.0 | ✅ Done |
 | 6 | Local volatility and SABR: Dupire in implied-volatility form, Hagan and its corrections | #6 | v1.6.0 | ✅ Done |
-| 7 | Exotic options: barriers, Asians, lookbacks and digitals, analytic against simulation | #7 | v1.7.0 | Next |
-| 8 | Hedging and model risk: Greeks P&L explain, discrete hedging, the book's risk | #8 | v1.8.0 | |
+| 7 | Exotic options: barriers, Asians, lookbacks and digitals, analytic against simulation | #7 | v1.7.0 | ✅ Done |
+| 8 | Hedging and model risk: Greeks P&L explain, discrete hedging, the book's risk | #8 | v1.8.0 | Next |
 | 9 | The platform: CLI, dashboard, reproducible reports and packaging | #9 | v1.9.0 | |
 
 ## Day 1 - the analytic foundation ✅
@@ -152,3 +152,22 @@ real market data, or properties that must hold for any input.
   at-the-money deltas range from 0.39 to 0.63.
 
 **Notes:** [local volatility and SABR](notes/local-volatility-and-sabr.md).
+
+## Day 7 - exotic options ✅
+
+**Issue #7, release v1.7.0.**
+
+- **Closed forms held to QuantLib.** Reiner-Rubinstein barriers, geometric Asians,
+  lookbacks and digitals agree with QuantLib to 1e-12 or better on hundreds of random
+  contracts.
+- **Monte Carlo held to the closed forms.** The Brownian bridge recovers continuous
+  monitoring from 12 dates. Broadie, Glasserman and Kou's correction holds daily but
+  overprices a near up-and-out by 9% monthly and 22% quarterly, so discrete contracts are
+  priced on their own grid.
+- **A reference that is not.** With the geometric control variate (variance cut about
+  900 times), two Monte Carlo engines agree on an arithmetic Asian. QuantLib's Choi engine
+  is 0.40% low at 52 fixings.
+- **One surface, three models.** On the S&P 500, Heston and local volatility agree on the
+  at-the-money call to 0.2% and price a 120% up-and-out call 35% apart.
+
+**Notes:** [exotic options](notes/exotic-options.md).
