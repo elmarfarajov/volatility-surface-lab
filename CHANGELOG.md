@@ -4,6 +4,60 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-10-14
+
+Day 8: hedging and model risk. Hedging measured in each model's world with each model's
+hedge, thirty-six years of the S&P 500 and the VIX, and an options book's explain, stress
+and historical risk.
+
+### Added
+
+- **`volsurf.risk.hedging`**:
+  - a self-financing hedging account for any paths and any hedge, the underlying and other
+    options included;
+  - Derman-Kamal and delta-gamma studies;
+  - the gamma P&L of hedging at the wrong volatility, path by path.
+- **`volsurf.risk.pricers`**:
+  - Heston prices and Greeks along paths, from a COS grid vectorised over strikes;
+  - local-volatility prices and deltas from a backward Dupire PDE;
+  - the minimum-variance delta.
+- **`volsurf.risk.models`**: hedging in Heston's world with four strategies, and the S&P 500
+  cross-model study (Heston and local-volatility worlds; Black-Scholes, local-volatility
+  and Heston hedges).
+- **`volsurf.risk.history`** and `volsurf history fetch`:
+  - S&P 500, VIX, VIX3M and bill-rate history, stored locally;
+  - a 1990-2026 backtest of daily-hedged short straddles;
+  - the spot-volatility regression;
+  - out-of-sample minimum-variance hedging errors.
+- **`volsurf.risk.explain`** and **`volsurf.risk.book`**:
+  - an eight-Greek P&L explain, with charm and veta;
+  - a dealer book's stress ladder under four smile dynamics;
+  - historical VaR and expected shortfall, from full revaluation and from Greeks.
+- **Gallery:** charts may now require the local history as well as the snapshot.
+- **Seven charts**, a methodology note, and ADRs 0025 to 0028.
+- **Four rows in `volsurf validate`**:
+  - the gamma formula;
+  - the eight-term explain;
+  - the local-volatility PDE against Black-Scholes;
+  - the Heston grid against the contour integral.
+- **Tests** for the accounting, both pricers, the studies, the backtest and the book, on
+  synthetic data.
+
+### Found
+
+- **The minimum-variance delta wins in simulation and on data.**
+  - **Heston's world:** it leaves 27% of the premium against 31% for Black-Scholes and 36%
+    for Heston's own delta.
+  - **S&P 500 data:** it removes 40% of daily hedging-error variance.
+- **The S&P 500's smile moves 1.8 times as far as sticky strike**, measured from 36 years of
+  the VIX against today's skew: between sticky strike and local volatility.
+- **Short straddles sold at the VIX and delta-hedged** made money 85% of the time and kept
+  21% of the premium. The worst trade, in September 2008, lost 9.6% of the index.
+- **For a dealer book, the smile dynamic changes a 10% stress from $2.0m to $7.6m.**
+- **Second-order Greeks misstate crash days in both directions**: they understate 2008 and
+  overstate 2020.
+- **A gamma hedge's error falls as `N^-0.67`, not `1/N`.**
+
 ## [1.7.0] - 2026-10-13
 
 Day 7: exotic options. Closed forms held to QuantLib, Monte Carlo held to the closed forms,
