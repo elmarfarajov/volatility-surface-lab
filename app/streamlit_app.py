@@ -1,191 +1,178 @@
-"""Interactive dashboard: `streamlit run app/streamlit_app.py`."""
+"""Interactive dashboard over every engine: `streamlit run app/streamlit_app.py`.
+
+It reads stored option-chain snapshots (`volsurf chains fetch ^SPX`) and never downloads on
+its own; without one it starts on a synthetic Heston chain, so it runs offline.
+"""
 
 from __future__ import annotations
-
-from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from volsurf.black_scholes import bsm_greeks, bsm_price
-from volsurf.calibration import calibrate_heston
-from volsurf.figures import surface_grid
-from volsurf.hedging import run_black_scholes_world, run_heston_world
-from volsurf.heston import HestonParams, heston_price_cos_spot, heston_price_integration
-from volsurf.implied_vol import implied_vol_bsm
-from volsurf.lattice import binomial_price
-from volsurf.market_data import build_snapshot, fetch_yfinance_chain, synthetic_chain
-from volsurf.monte_carlo import mc_european_gbm
-from volsurf.pipeline import fit_surface
+from volsurf.analytic.generalized import greeks
+from volsurf.exotics import closed_form as cf
+from volsurf.exotics.monte_carlo import barrier_mc, bgk_barrier
+from volsurf.localvol.dupire import local_vol
+from volsurf.localvol.dynamics import monthly
+from volsurf.market import chains
+from volsurf.market.cleaning import prepare
+from volsurf.numerics import lattice, pde
+from volsurf.numerics.lattice import Contract
+from volsurf.platform.analysis import model_expiries
+from volsurf.platform.report import surface_figure
+from volsurf.platform.sources import Source, snapshot, synthetic
+from volsurf.risk import book as bk
+from volsurf.risk.hedging import black_scholes_study, wrong_volatility
+from volsurf.smile.build import SurfaceFit, build_surface
+from volsurf.stochvol.calibration import model_vols, multistart
 
 st.set_page_config(page_title="Volatility Surface Lab", layout="wide")
-
-SYNTHETIC_PARAMS = HestonParams(v0=0.028, kappa=2.5, theta=0.042, sigma=0.8, rho=-0.74)
-
-
-@st.cache_data(show_spinner="Building option market ...")
-def load_snapshot(source: str, ticker: str, expiries: int):
-    if source == "Synthetic Heston market":
-        raw = synthetic_chain(SYNTHETIC_PARAMS, maturities_days=(16, 44, 107, 261, 534))
-        return build_snapshot(raw, 5000.0, datetime.now(timezone.utc), "SYNTHETIC", "synthetic")
-    raw, spot, as_of = fetch_yfinance_chain(ticker, max_expiries=expiries)
-    return build_snapshot(raw, spot, as_of, ticker, "Yahoo Finance (delayed)")
+SYNTHETIC = "Synthetic Heston chain (offline)"
 
 
-@st.cache_resource(show_spinner="Fitting arbitrage-controlled SVI surface ...")
-def load_surface(source: str, ticker: str, expiries: int):
-    return fit_surface(load_snapshot(source, ticker, expiries))
+@st.cache_resource(show_spinner="Loading the option chain ...")
+def load_source(choice: str) -> Source:
+    if choice == SYNTHETIC:
+        return synthetic()
+    ticker, day = choice.split(" on ")
+    return snapshot(ticker, day)
+
+
+@st.cache_resource(show_spinner="Cleaning quotes and fitting the arbitrage-free surface ...")
+def load_fit(choice: str) -> SurfaceFit:
+    return build_surface(prepare(load_source(choice).chain))
 
 
 st.title("Volatility Surface Lab")
-st.caption("Option pricing, arbitrage-free SVI surfaces, Heston calibration and a delta-hedging model-risk lab.")
+choices = [f"{name} on {day}" for day, name in chains.snapshots()] + [SYNTHETIC]
+choice = st.sidebar.selectbox("Option chain", choices, index=len(choices) - 1)
+st.sidebar.caption("Store more with `volsurf chains fetch ^SPX`. Every engine below is validated in docs/VALIDATION.md.")
+source = load_source(choice)
+st.caption(source.describe())
 
-with st.sidebar:
-    st.header("Market data")
-    source = st.radio("Source", ["Synthetic Heston market", "Live (Yahoo Finance)"], index=0)
-    ticker = st.text_input("Ticker", "^SPX", disabled=source != "Live (Yahoo Finance)")
-    n_expiries = st.slider("Expiries", 4, 10, 6, disabled=source != "Live (Yahoo Finance)")
+pricer, surface_tab, models, exotics, hedging, risk = st.tabs(["Pricer", "Surface", "Models", "Exotics", "Hedging", "Risk"])
 
-pricing_tab, surface_tab, calibration_tab, hedging_tab = st.tabs(
-    ["Pricing lab", "Volatility surface", "Heston calibration", "Hedging lab"]
-)
-
-with pricing_tab:
-    c1, c2, c3 = st.columns(3)
-    spot = c1.number_input("Spot", value=100.0, min_value=0.01)
-    strike = c1.number_input("Strike", value=100.0, min_value=0.01)
-    maturity = c2.number_input("Maturity (years)", value=0.5, min_value=0.01, max_value=10.0)
-    vol = c2.number_input("Black-Scholes vol", value=0.2, min_value=0.01, max_value=3.0)
-    rate = c3.number_input("Rate", value=0.04, step=0.005, format="%.3f")
-    dividend = c3.number_input("Dividend yield", value=0.01, step=0.005, format="%.3f")
-    is_call = st.radio("Type", ["Call", "Put"], horizontal=True) == "Call"
-
-    greeks = bsm_greeks(spot, strike, maturity, rate, dividend, vol, is_call)
-    mc = mc_european_gbm(spot, strike, maturity, rate, dividend, vol, is_call, 100_000, seed=1)
-    engines = pd.DataFrame(
-        [
-            ("Black-Scholes analytic", float(bsm_price(spot, strike, maturity, rate, dividend, vol, is_call)), None),
-            ("Leisen-Reimer tree (301)", binomial_price(spot, strike, maturity, rate, dividend, vol, is_call, steps=301), None),
-            (
-                "CRR tree (1000)",
-                binomial_price(spot, strike, maturity, rate, dividend, vol, is_call, steps=1000, method="crr"),
-                None,
-            ),
-            ("Monte Carlo + control variate", mc.price, mc.std_error),
-            ("American (Leisen-Reimer)", binomial_price(spot, strike, maturity, rate, dividend, vol, is_call, True, 501), None),
-        ],
-        columns=["engine", "price", "std error"],
-    )
-    left, right = st.columns([1, 1])
-    left.subheader("Black-Scholes engines")
-    left.dataframe(engines, hide_index=True, use_container_width=True)
-    left.dataframe(
-        pd.DataFrame({k: [float(getattr(greeks, k))] for k in ("delta", "gamma", "vega", "theta", "rho", "vanna", "volga")}),
-        hide_index=True,
-        use_container_width=True,
-    )
-
-    right.subheader("Heston smile")
-    h1, h2 = right.columns(2)
-    v0 = h1.slider("v0", 0.005, 0.2, 0.04, 0.005)
-    theta = h1.slider("theta", 0.005, 0.2, 0.04, 0.005)
-    kappa = h1.slider("kappa", 0.1, 10.0, 2.0, 0.1)
-    sigma = h2.slider("sigma (vol of vol)", 0.05, 2.0, 0.6, 0.05)
-    rho = h2.slider("rho", -0.95, 0.5, -0.7, 0.05)
-    params = HestonParams(v0, kappa, theta, sigma, rho)
-    strikes = spot * np.exp(np.linspace(-0.4, 0.3, 60) * max(np.sqrt(maturity), 0.3))
-    forward = spot * np.exp((rate - dividend) * maturity)
-    prices = heston_price_cos_spot(spot, strikes, maturity, rate, dividend, params, strikes >= forward)
-    smile = implied_vol_bsm(prices, spot, strikes, maturity, rate, dividend, strikes >= forward)
-    fig = go.Figure(go.Scatter(x=strikes, y=100 * smile, mode="lines", name="Heston implied vol"))
-    fig.update_layout(height=320, margin={"t": 10, "b": 10}, xaxis_title="strike", yaxis_title="implied vol (%)")
-    right.plotly_chart(fig, use_container_width=True)
-    heston_cos = float(heston_price_cos_spot(spot, [strike], maturity, rate, dividend, params, is_call)[0])
-    heston_quad = heston_price_integration(forward, strike, maturity, np.exp(-rate * maturity), params, is_call)
-    right.metric(
-        "Heston price (COS)", f"{heston_cos:.6f}", delta=f"{heston_cos - heston_quad:+.1e} vs quadrature", delta_color="off"
-    )
-    right.caption(f"Feller ratio 2*kappa*theta/sigma^2 = {params.feller_ratio:.2f}")
-
-try:
-    snapshot = load_snapshot(source, ticker, n_expiries)
-    fits, surface = load_surface(source, ticker, n_expiries)
-    data_error = None
-except Exception as exc:  # network or data problems should not take the whole app down
-    snapshot = fits = surface = None
-    data_error = exc
+with pricer:
+    c1, c2, c3, c4 = st.columns(4)
+    s = c1.number_input("Spot", value=100.0, min_value=0.01)
+    k = c1.number_input("Strike", value=100.0, min_value=0.01)
+    t = c2.number_input("Years to expiry", value=0.5, min_value=0.0)
+    vol = c2.number_input("Volatility", value=0.2, min_value=0.0)
+    r = c3.number_input("Rate", value=0.04)
+    q = c3.number_input("Dividend yield (or foreign rate)", value=0.01)
+    call = c4.radio("Type", ["call", "put"]) == "call"
+    g = greeks(s, k, t, r, q, vol, call)
+    table = pd.DataFrame({"Greek": list(g.as_dict()), "value": [float(v) for v in g.as_dict().values()]})
+    st.dataframe(table, hide_index=True, use_container_width=False)
+    if t > 0 and vol > 0:
+        contract = Contract(s, k, t, r, q, vol, call)
+        engines = {
+            "analytic": float(g.price),
+            "Leisen-Reimer tree (301)": lattice.price(contract, 301).price,
+            "Crank-Nicolson PDE": pde.solve(contract, 400, 400).price,
+            "American, Leisen-Reimer (1001)": lattice.price(contract, 1001, exercise="american").price,
+        }
+        st.dataframe(pd.DataFrame({"engine": list(engines), "price": list(engines.values())}), hide_index=True)
 
 with surface_tab:
-    if data_error is not None:
-        st.error(f"Could not load market data: {data_error}")
-    else:
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Spot", f"{snapshot.spot:,.2f}")
-        m2.metric("Expiries / quotes", f"{len(snapshot.expiries)} / {sum(len(e.quotes) for e in snapshot.expiries)}")
-        m3.metric("Worst SVI slice RMSE", f"{100 * max(f.rmse_vol for f in fits):.2f} vol pts")
-        z, maturities, vol_grid = surface_grid(surface, snapshot)
-        surface_fig = go.Figure(go.Surface(x=z, y=maturities, z=100 * vol_grid, colorscale="Viridis"))
-        surface_fig.update_layout(
-            height=520,
-            margin={"l": 0, "r": 0, "t": 0, "b": 0},
-            scene={"xaxis_title": "ln(K/F)/sqrt(T)", "yaxis_title": "T (years)", "zaxis_title": "vol (%)"},
-        )
-        st.plotly_chart(surface_fig, use_container_width=True)
-
-        labels = [f"{e.expiry} (T={e.maturity:.2f})" for e in snapshot.expiries]
-        choice = st.selectbox("Smile", labels)
-        idx = labels.index(choice)
-        expiry, fit = snapshot.expiries[idx], fits[idx]
-        grid = np.linspace(expiry.quotes["k"].min(), expiry.quotes["k"].max(), 150)
-        smile_fig = go.Figure()
-        smile_fig.add_trace(
-            go.Scatter(x=expiry.quotes["k"], y=100 * expiry.quotes["iv_bid"], mode="markers", name="bid", marker={"size": 4})
-        )
-        smile_fig.add_trace(
-            go.Scatter(x=expiry.quotes["k"], y=100 * expiry.quotes["iv_ask"], mode="markers", name="ask", marker={"size": 4})
-        )
-        smile_fig.add_trace(go.Scatter(x=grid, y=100 * fit.slice.implied_vol(grid), mode="lines", name="SVI"))
-        smile_fig.update_layout(height=360, xaxis_title="ln(K/F)", yaxis_title="implied vol (%)", margin={"t": 10})
-        st.plotly_chart(smile_fig, use_container_width=True)
-        st.dataframe(snapshot.term_structure(), hide_index=True, use_container_width=True)
-
-with calibration_tab:
-    if data_error is not None:
-        st.error(f"Could not load market data: {data_error}")
-    elif st.button("Calibrate Heston to this surface", type="primary"):
-        with st.spinner("Calibrating ..."):
-            result = calibrate_heston(snapshot)
-        st.session_state["calibration"] = result
-    if "calibration" in st.session_state and data_error is None:
-        result = st.session_state["calibration"]
-        st.dataframe(pd.DataFrame([result.summary()]), hide_index=True, use_container_width=True)
-        by_expiry = result.error_by_expiry()
-        bar = go.Figure(go.Bar(x=by_expiry["expiry"], y=by_expiry["rmse_vol_pts"]))
-        bar.update_layout(height=320, yaxis_title="RMSE (vol pts)", margin={"t": 10})
-        st.plotly_chart(bar, use_container_width=True)
-
-with hedging_tab:
-    st.write(
-        "Sell a 3-month at-the-money call at model value and delta-hedge it. Compare hedge ratios in a "
-        "Black-Scholes world and in a Heston world."
+    fit = load_fit(choice)
+    margins = pd.DataFrame(
+        {
+            "days": [365 * f.maturity for f in fit.svi],
+            "RMSE (vol pts)": [100 * f.rmse for f in fit.svi],
+            "min g (butterfly)": [f.butterfly_margin for f in fit.svi],
+            "min calendar gap": [f.calendar_margin for f in fit.svi],
+        }
     )
-    paths = st.slider("Monte Carlo paths", 500, 5000, 1500, 500)
-    hedge_params = st.session_state["calibration"].params if "calibration" in st.session_state else SYNTHETIC_PARAMS
-    st.caption(f"Heston world parameters: {hedge_params}")
-    if st.button("Run hedging experiment"):
-        with st.spinner("Simulating ..."):
-            bs = run_black_scholes_world(n_paths=10_000, rebalances=(4, 16, 64, 256))
-            hw = run_heston_world(hedge_params, n_paths=paths, rebalances=(3, 9, 21, 63))
-        summary = pd.concat([bs.summary(), hw.summary()], ignore_index=True)
-        lines = go.Figure()
-        for (world, strategy), group in summary[summary["rebalances"] > 0].groupby(["world", "strategy"], sort=False):
-            lines.add_trace(
-                go.Scatter(x=group["rebalances"], y=group["std_pct_premium"], mode="lines+markers", name=f"{world}: {strategy}")
-            )
-        lines.update_layout(
-            height=420, xaxis_type="log", yaxis_type="log", xaxis_title="rebalances", yaxis_title="std of P&L (% of premium)"
+    st.metric("Median fit error", f"{margins['RMSE (vol pts)'].median():.2f} vol pts")
+    st.plotly_chart(surface_figure(fit), use_container_width=True)
+    i = st.select_slider(
+        "Expiry", options=list(range(len(fit.quotes))), format_func=lambda j: f"{365 * fit.quotes[j].maturity:.0f} days"
+    )
+    quotes = fit.quotes[i]
+    grid = np.linspace(float(quotes.k.min()), float(quotes.k.max()), 200)
+    smile = go.Figure()
+    smile.add_scatter(x=quotes.k, y=100 * quotes.iv, mode="markers", name="mid quotes")
+    smile.add_scatter(x=grid, y=100 * fit.surface.implied_vol(grid, quotes.maturity), name="arbitrage-free SVI")
+    smile.update_layout(xaxis_title="ln(K/F)", yaxis_title="implied vol (%)", height=380)
+    st.plotly_chart(smile, use_container_width=True)
+    st.dataframe(margins, hide_index=True)
+
+with models:
+    fit = load_fit(choice)
+    starts = st.slider("Heston calibration: Sobol' starts", 1, 16, 2)
+    if st.button("Calibrate Heston"):
+        expiries = model_expiries(prepare(source.chain))
+        with st.spinner("Calibrating ..."):
+            st.session_state["calibration"] = multistart(expiries, starts)[0]
+            st.session_state["calibration_expiries"] = expiries
+    if "calibration" in st.session_state:
+        cal = st.session_state["calibration"]
+        h = cal.heston
+        st.write(f"v0 {h.v0:.4f}, kappa {h.kappa:.2f}, theta {h.theta:.4f}, vol of vol {h.sigma:.2f}, rho {h.rho:.2f}")
+        st.metric("RMSE", f"{100 * cal.rmse:.2f} vol pts")
+        expiries = st.session_state["calibration_expiries"]
+        vols = model_vols(h, expiries)
+        fig = go.Figure()
+        for e, v in zip(expiries, vols, strict=True):
+            fig.add_scatter(x=e.k, y=100 * e.iv, mode="markers", name=f"{365 * e.maturity:.0f}d market")
+            fig.add_scatter(x=e.k, y=100 * v, mode="lines", name=f"{365 * e.maturity:.0f}d Heston")
+        fig.update_layout(xaxis_title="ln(K/F)", yaxis_title="implied vol (%)", height=420)
+        st.plotly_chart(fig, use_container_width=True)
+    surface = monthly(fit.surface)
+    times = np.linspace(float(surface.maturities[0]), float(surface.maturities[-1]), 30)
+    kk = np.linspace(-0.4, 0.2, 41)
+    heat = go.Figure(go.Heatmap(x=kk, y=365 * times, z=100 * np.clip([local_vol(surface, kk, float(x)) for x in times], 0, 1)))
+    heat.update_layout(title="Dupire local volatility (%)", xaxis_title="ln(K/F)", yaxis_title="days", height=420)
+    st.plotly_chart(heat, use_container_width=True)
+
+with exotics:
+    c1, c2, c3 = st.columns(3)
+    kind = c1.selectbox("Barrier", ["down-out", "down-in", "up-out", "up-in"])
+    h_level = c1.number_input("Barrier level", value=85.0 if kind.startswith("down") else 120.0)
+    xs = c2.number_input("Strike ", value=100.0)
+    vol_e = c2.number_input("Volatility ", value=0.25)
+    monitoring = c3.select_slider("Monitoring dates a year", [4, 12, 52, 252], value=52)
+    try:
+        exact = cf.barrier(kind, 100.0, xs, h_level, 1.0, 0.05, 0.03, vol_e, True)  # type: ignore[arg-type]
+    except ValueError as error:
+        st.warning(str(error))
+    else:
+        mc = barrier_mc(kind, 100.0, xs, h_level, 1.0, 0.05, 0.03, vol_e, True, monitoring, 40_000)
+        rows = {
+            "continuous, closed form": exact,
+            "discrete, BGK correction": bgk_barrier(kind, 100.0, xs, h_level, 1.0, 0.05, 0.03, vol_e, True, monitoring),
+            f"discrete, Monte Carlo ({mc.stderr:.3f} se)": mc.value,
+        }
+        st.dataframe(pd.DataFrame({"price": rows}), use_container_width=False)
+    st.write(
+        f"Geometric Asian (52 fixings) {cf.geometric_asian(100.0, xs, 1.0, 0.05, 0.03, vol_e, True, 52):.4f} - "
+        f"floating lookback call {cf.floating_lookback(100.0, 100.0, 1.0, 0.05, 0.03, vol_e, True):.4f} - "
+        f"cash digital {cf.cash_or_nothing(100.0, xs, 1.0, 0.05, 0.03, vol_e, 1.0, True):.4f}"
+    )
+
+with hedging:
+    paths = st.select_slider("Paths", [2_000, 5_000, 20_000], value=2_000)
+    if st.button("Run the Black-Scholes hedging study"):
+        study = black_scholes_study(paths=paths, steps=252, rebalances=(12, 63, 252), show=63)
+        tab = study.table.assign(
+            **{c: 100 * study.table[c] / study.table["premium"] for c in ("delta", "delta_gamma", "derman_kamal")}
         )
-        st.plotly_chart(lines, use_container_width=True)
-        st.dataframe(summary, hide_index=True, use_container_width=True)
+        st.dataframe(
+            tab.drop(columns="premium").rename(columns=lambda c: f"{c} (% premium)" if c != "rebalances" else c), hide_index=True
+        )
+    sigma_true = st.slider("Realised volatility when hedging at 20%", 0.1, 0.4, 0.25)
+    w = wrong_volatility(sigma_true=sigma_true, paths=paths, steps=63)
+    st.metric("Mean hedged P&L", f"{100 * w.pnl.mean() / w.premium:.1f}% of premium")
+    st.metric("Correlation with the gamma formula", f"{np.corrcoef(w.pnl, w.predicted)[0, 1]:.3f}")
+
+with risk:
+    fit = load_fit(choice)
+    book = bk.build(fit)
+    c = st.slider("Smile dynamic: 0 sticky moneyness, 1 sticky strike, 2 local volatility", 0.0, 2.5, 1.0, 0.1)
+    moves = np.linspace(-0.2, 0.1, 13)
+    ladder = bk.stress_ladder(book, moves, {"P&L ($)": c})
+    st.line_chart(ladder.rename(index=lambda m: f"{100 * m:+.1f}%"))
+    st.caption(", ".join(f"{n:+.0f} {name}" for name, n in zip(book.names, book.contracts, strict=True)) + "; delta-hedged.")

@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from volsurf.surface import VolSurface
-from volsurf.svi import SVISlice, fit_svi_slice
+from volsurf.legacy.surface import VolSurface
+from volsurf.legacy.svi import SVISlice, fit_svi_slice
 
 GOOD = SVISlice(a=0.01, b=0.08, rho=-0.6, m=0.02, s=0.15, maturity=0.5)
 

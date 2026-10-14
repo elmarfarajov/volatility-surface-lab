@@ -13,8 +13,8 @@ from pathlib import Path
 
 from matplotlib.figure import Figure
 
+from ..market.chains import latest
 from ..risk import history
-from . import analytic, exotics, hedging, heston, localvol, market, numerics, smiles
 from .style import save
 
 DAYS: dict[int, str] = {
@@ -42,10 +42,15 @@ class Item:
 
     def available(self) -> bool:
         needs = set((self.requires or "").split("+")) - {""}
-        return ("snapshot" not in needs or market.snapshot_available()) and ("history" not in needs or history.available())
+        snapshot = all(latest(t) is not None for t in ("SPX", "SPY", "AAPL"))
+        return ("snapshot" not in needs or snapshot) and ("history" not in needs or history.available())
 
 
 def items() -> tuple[Item, ...]:
+    # imported here, not at the top: the charts need the dev extras (QuantLib, mpmath), and the platform's
+    # report uses this package's house style without them
+    from . import analytic, exotics, hedging, heston, localvol, market, numerics, smiles
+
     return (
         Item(
             "greek-atlas.png",

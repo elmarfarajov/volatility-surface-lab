@@ -30,3 +30,6 @@
 | [0026](0026-the-minimum-variance-delta-is-the-hedge-ratio.md) | The minimum-variance delta is the hedge ratio, and the smile dynamic behind it is measured | Accepted |
 | [0027](0027-real-data-backtests-state-their-proxies.md) | Real-data backtests state their proxies, are checked against theory, and keep their data local | Accepted |
 | [0028](0028-book-risk-is-full-revaluation-under-stated-smile-dynamics.md) | A book's risk is full revaluation under stated smile dynamics; the Greeks explain, they do not measure | Accepted |
+| [0029](0029-one-analysis-over-the-rebuilt-engines.md) | One analysis runs over the rebuilt engines, and the v1 pipeline is retired | Accepted |
+| [0030](0030-every-run-records-a-manifest-and-can-be-reproduced.md) | Every run records a manifest, and `volsurf reproduce` reruns it and compares every number | Accepted |
+| [0031](0031-the-wheel-is-tested-on-its-own.md) | The wheel is tested on its own, without the development extras | Accepted |

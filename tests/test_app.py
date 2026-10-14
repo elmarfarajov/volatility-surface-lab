@@ -9,7 +9,7 @@ APP = Path(__file__).resolve().parents[1] / "app" / "streamlit_app.py"
 
 
 @pytest.mark.slow
-def test_dashboard_renders_offline_and_runs_calibration():
+def test_dashboard_renders_offline_and_runs_the_heston_calibration():
     app = AppTest.from_file(str(APP), default_timeout=300)
     app.run()
     assert not app.exception
@@ -18,4 +18,4 @@ def test_dashboard_renders_offline_and_runs_calibration():
     app.button[0].click().run()
     assert not app.exception
     assert "calibration" in app.session_state
-    assert app.session_state["calibration"].rmse_vol < 0.01
+    assert app.session_state["calibration"].rmse < 0.01  # the synthetic chain is Heston with 0.2-point noise

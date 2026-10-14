@@ -1,29 +1,72 @@
+"""The platform end to end: a quick analysis into a report and manifest, its reproduction, and the command line."""
+
+from __future__ import annotations
+
+import json
+
 import pandas as pd
 import pytest
 
 from volsurf.cli import build_parser, main
-from volsurf.pipeline import AnalysisConfig, run_analysis
-from volsurf.report import write_report
+from volsurf.platform import manifest, sources
 from volsurf.validation import run_validation, to_markdown
 
 
-def test_end_to_end_report(tmp_path, noisy_snapshot):
-    config = AnalysisConfig(heston_hedge_paths=400, heston_rebalances=(3, 9), bs_hedge_paths=2_000, bs_rebalances=(4, 16))
-    result = run_analysis(noisy_snapshot, config, log=lambda _: None)
-    path = write_report(result, tmp_path)
-    html = path.read_text(encoding="utf-8")
-    assert "Hedging lab" in html and "Heston calibration" in html
-    for name in ("vol_surface_3d", "smiles", "term_structure", "local_vol", "densities", "calibration_residuals", "hedging_lab"):
-        assert (tmp_path / "figures" / f"{name}.png").stat().st_size > 10_000
-    assert len(result.svi_fits) == len(noisy_snapshot.expiries)
+@pytest.fixture(scope="module")
+def demo(tmp_path_factory):
+    out = tmp_path_factory.mktemp("demo")
+    main(["demo", "--quick", "--out", str(out)])
+    return out
 
 
-def test_cli_demo_without_hedging(tmp_path, capsys):
-    main(["demo", "--out", str(tmp_path), "--no-hedging"])
-    assert (tmp_path / "report.html").exists()
-    residuals = pd.read_csv(tmp_path / "heston_residuals.csv")
-    assert residuals["error"].abs().mean() < 0.01
-    assert "Report:" in capsys.readouterr().out
+def test_the_demo_writes_a_report_its_figures_tables_and_manifest(demo):
+    page = (demo / "report.html").read_text(encoding="utf-8")
+    for section in ("The surface", "Heston and SABR", "Exotics under three models", "Hedging and model risk", "dealer book"):
+        assert section in page
+    figures = {p.stem for p in (demo / "figures").glob("*.png")}
+    assert figures == {
+        "surface",
+        "smiles",
+        "term-structure",
+        "densities-local-vol",
+        "heston-residuals",
+        "exotics",
+        "hedging",
+        "book",
+    }
+    assert all(p.stat().st_size > 20_000 for p in (demo / "figures").glob("*.png"))
+    assert pd.read_csv(demo / "tables" / "svi.csv")["rmse_vol"].max() < 0.01
+    record = json.loads((demo / "manifest.json").read_text(encoding="utf-8"))
+    assert record["source"]["kind"] == "synthetic" and len(record["source"]["sha256"]) == 64
+    assert record["config"]["quick"] is True
+    # the synthetic chain is Heston with known parameters, and the calibration finds them
+    assert record["results"]["heston.rho"] == pytest.approx(-0.74, abs=0.03)
+    assert record["results"]["heston.sigma"] == pytest.approx(0.8, abs=0.08)
+
+
+def test_a_rerun_reproduces_every_number(demo):
+    comparisons = manifest.reproduce(demo, log=lambda _: None)
+    assert len(comparisons) > 40
+    assert all(c.agrees for c in comparisons), [c for c in comparisons if not c.agrees]
+
+
+def test_a_changed_source_is_refused(demo, tmp_path):
+    record = json.loads((demo / "manifest.json").read_text(encoding="utf-8"))
+    record["source"]["sha256"] = "0" * 64
+    (tmp_path / "manifest.json").write_text(json.dumps(record), encoding="utf-8")
+    with pytest.raises(ValueError, match="source has changed"):
+        manifest.reproduce(tmp_path, log=lambda _: None)
+
+
+def test_the_synthetic_source_is_deterministic():
+    assert sources.synthetic(seed=7).sha256 == sources.synthetic(seed=7).sha256
+    assert sources.synthetic(seed=7).sha256 != sources.synthetic(seed=8).sha256
+
+
+def test_without_a_snapshot_analyze_says_how_to_get_one(tmp_path, monkeypatch):
+    monkeypatch.setenv("VOLSURF_DATA", str(tmp_path))
+    with pytest.raises(FileNotFoundError, match="volsurf chains fetch"):
+        main(["analyze", "--ticker", "^SPX", "--out", str(tmp_path / "out")])
 
 
 def test_cli_price_prints_every_engine(capsys):
@@ -45,13 +88,20 @@ def test_cli_price_prints_every_engine(capsys):
         ]
     )
     out = capsys.readouterr().out
-    for engine in ("Black-Scholes", "Leisen-Reimer", "Longstaff-Schwartz", "Heston: COS", "Heston: QE Monte Carlo"):
+    for engine in (
+        "Black-Scholes-Merton",
+        "Leisen-Reimer",
+        "Crank-Nicolson",
+        "Longstaff-Schwartz",
+        "Heston: COS",
+        "Heston: QE Monte Carlo",
+    ):
         assert engine in out
+    prices = {line.split("  ")[0]: float(line.split()[-1] if "+-" not in line else line.split()[-3]) for line in out.splitlines()}
+    assert prices["Heston: contour integral"] == pytest.approx(prices["Heston: COS"], abs=1e-8)
 
 
 def test_parser_rejects_unknown_command():
-    import pytest
-
     with pytest.raises(SystemExit):
         build_parser().parse_args(["unknown"])
 
@@ -61,20 +111,6 @@ def test_validation_suite_passes_in_fast_mode():
     results = run_validation(fast=True)
     assert len(results) >= 16
     assert results["passed"].all(), results.loc[~results["passed"], ["check", "result", "error"]].to_string()
-
-
-def test_replay_saved_chain(tmp_path, true_params, capsys):
-    import json
-
-    from volsurf.market_data import synthetic_chain
-
-    raw = synthetic_chain(true_params, maturities_days=(30, 90, 180, 365, 540), strikes_per_expiry=21)
-    raw.to_csv(tmp_path / "raw_chain.csv", index=False)
-    meta = {"ticker": "REPLAY", "spot": 5000.0, "as_of": "2026-09-15T20:00:00+00:00"}
-    (tmp_path / "raw_chain.json").write_text(json.dumps(meta), encoding="utf-8")
-    main(["analyze", "--raw-csv", str(tmp_path / "raw_chain.csv"), "--out", str(tmp_path / "out"), "--no-hedging"])
-    assert "REPLAY" in (tmp_path / "out" / "report.html").read_text(encoding="utf-8")
-    assert "Replaying saved REPLAY chain" in capsys.readouterr().out
 
 
 def test_validation_markdown_format():

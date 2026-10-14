@@ -11,15 +11,13 @@ import numpy as np
 import pandas as pd
 
 from .black_scholes import black76_price, bsm_greeks, bsm_price
-from .calibration import calibrate_heston
-from .hedging import run_black_scholes_world
 from .heston import HestonParams, heston_cos_sensitivities, heston_price_cos, heston_price_integration
 from .implied_vol import implied_vol_black76
 from .lattice import binomial_price
-from .market_data import build_snapshot, synthetic_chain
+from .legacy.svi import SVISlice
+from .market_data import synthetic_chain
 from .monte_carlo import lsm_american_price, mc_european_gbm, mc_european_heston
 from .stochvol.calibration import model_vols as calibration_model_vols
-from .svi import SVISlice
 
 FANG_OOSTERLEE_PARAMS = HestonParams(v0=0.0175, kappa=1.5768, theta=0.0398, sigma=0.5751, rho=-0.5711)
 FANG_OOSTERLEE_PRICE = 5.785155450
@@ -316,23 +314,12 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
         )
         return "arbitrage present (Gatheral-Jacquier 2014)", f"min g(k) = {g:.4f}", "detected" if g < 0 else "missed", g < 0
 
-    def calibration_recovery():
-        truth = HestonParams(0.035, 2.2, 0.045, 0.75, -0.72)
-        snap = build_snapshot(synthetic_chain(truth, iv_noise=0.0), 5000.0, datetime.now(timezone.utc), "SYNTH", "synthetic")
-        res = calibrate_heston(snap)
-        rel = np.abs(res.params.as_array() - truth.as_array()) / np.abs(truth.as_array())
-        return (
-            "synthetic surface from known parameters",
-            f"RMSE {100 * res.rmse_vol:.3f} vol pts in {res.elapsed_seconds:.1f}s",
-            f"max param error {100 * rel.max():.1f}%",
-            rel.max() < 0.05,
-        )
-
     def derman_kamal():
-        exp = run_black_scholes_world(n_paths=10_000 if fast else 40_000, rebalances=(16, 64, 256))
-        s = exp.summary()
-        ratios = [row.std_pnl / exp.notes[f"derman_kamal_std_{row.rebalances}"] for row in s.itertuples()]
-        worst = max(abs(x - 1) for x in ratios)
+        from .risk.hedging import black_scholes_study
+
+        study = black_scholes_study(paths=10_000 if fast else 40_000, steps=256, rebalances=(16, 64, 256), show=64)
+        ratios = (study.table["delta"] / study.table["derman_kamal"]).to_numpy()
+        worst = float(np.max(np.abs(ratios - 1)))
         return (
             "sqrt(pi/4) vega sigma / sqrt(N)",
             "ratios " + ", ".join(f"{x:.3f}" for x in ratios),
@@ -440,7 +427,6 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
         return "exact total volatility", f"{tiny.sum():,} prices, 1e-300..1e-10 (v1.0: 400% off)", f"{worst:.1e}", worst < 1e-12
 
     def parity_recovery():
-        from datetime import datetime, timezone
 
         from .market.chains import Chain
         from .market.cleaning import prepare
@@ -460,7 +446,6 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
         )
 
     def _synthetic_surface():
-        from datetime import datetime, timezone
 
         from .market.chains import Chain
         from .market.cleaning import prepare
@@ -682,7 +667,6 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
         return "Andersen-Piterbarg explosion time", f"{n} edges of random strips", f"{failures} failures", failures == 0
 
     def _heston_surface_monthly():
-        from datetime import datetime, timezone
 
         from .market.chains import Chain
         from .market.cleaning import prepare
@@ -995,6 +979,25 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
             median < 0.005 and tail < 0.1,
         )
 
+    def platform_reproduces():
+        import tempfile
+        from pathlib import Path
+
+        from .platform import analysis, manifest, report, sources
+
+        with tempfile.TemporaryDirectory() as folder:
+            run = analysis.run(sources.synthetic(), analysis.Config.fast(hedging=False), log=lambda _: None)
+            report.write(run, Path(folder))
+            comparisons = manifest.reproduce(Path(folder), log=lambda _: None)
+        agree = sum(c.agrees for c in comparisons)
+        h = run.heston.heston
+        return (
+            "the recorded run, from the same SHA-256 source",
+            f"{agree} of {len(comparisons)} numbers; Heston recovered rho {h.rho:.3f} (true -0.74)",
+            "relative 1e-6",
+            agree == len(comparisons) and abs(h.rho + 0.74) < 0.03,
+        )
+
     add("Analytic", "Published examples", haug)
     add("Analytic", "Seventeen Greeks vs arbitrary precision", mpmath_greeks)
     add("Analytic", "Black-Scholes PDE from the Greeks", pde)
@@ -1041,12 +1044,12 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
     add("Surface", "Constrained SVI on a Heston chain", constrained_fit)
     add("Surface", "Risk-neutral densities", densities)
     add("Surface", "Price interpolation in time", price_interpolation)
-    add("Calibration", "Parameter recovery", calibration_recovery)
     add("Hedging", "Discrete-hedging error vs theory", derman_kamal)
     add("Hedging", "Gamma P&L of hedging at the wrong volatility", gamma_formula)
     add("Hedging", "P&L explained by eight Greeks", pnl_explain)
     add("Hedging", "Local-volatility PDE against Black-Scholes", lv_pde_flat)
     add("Hedging", "Heston price grid against the contour integral", heston_grid)
+    add("Platform", "A rerun reproduces every number", platform_reproduces)
 
     return pd.DataFrame([c.__dict__ for c in checks])
 

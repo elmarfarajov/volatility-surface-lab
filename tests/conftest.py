@@ -18,9 +18,3 @@ def true_params() -> HestonParams:
 def clean_snapshot():
     raw = synthetic_chain(TRUE_PARAMS, maturities_days=(23, 72, 170, 352, 716), strikes_per_expiry=25, iv_noise=0.0)
     return build_snapshot(raw, 5000.0, AS_OF, "SYNTH", "synthetic")
-
-
-@pytest.fixture(scope="session")
-def noisy_snapshot():
-    raw = synthetic_chain(TRUE_PARAMS, maturities_days=(23, 72, 170, 352, 716), strikes_per_expiry=25, iv_noise=0.002, seed=3)
-    return build_snapshot(raw, 5000.0, AS_OF, "SYNTH", "synthetic")
