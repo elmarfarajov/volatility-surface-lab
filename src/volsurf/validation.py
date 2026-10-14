@@ -909,6 +909,92 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
             z < 4,
         )
 
+    def gamma_formula():
+        from .risk.hedging import wrong_volatility
+
+        w = wrong_volatility(paths=10_000 if fast else 20_000)
+        corr = float(np.corrcoef(w.pnl, w.predicted)[0, 1])
+        gap = abs(float(w.pnl.mean() - w.predicted.mean())) / w.premium
+        return (
+            "1/2 sum Gamma S^2 (sigma_h^2 dt - (dS/S)^2), path by path",
+            f"hedged at 20% in a 25% world; correlation {corr:.4f}",
+            f"mean gap {100 * gap:.2f}% of premium",
+            corr > 0.99 and gap < 0.01,
+        )
+
+    def lv_pde_flat():
+        from .analytic.generalized import greeks
+        from .risk.pricers import LocalVolGrid
+        from .smile.interpolation import Surface
+        from .smile.svi import RawSVI
+
+        surface = Surface(np.array([2.0]), [RawSVI(0.04 * 2.0, 0.0, 0.0, 0.0, 0.1)])
+        grid = LocalVolGrid.build(surface, 1.0, 0.5, 0.04, 0.03)
+        spots = np.linspace(0.7, 1.3, 13)
+        price_err = delta_err = 0.0
+        for t in (0.0, 0.25, 0.45):
+            val = grid.at(t, spots)
+            bs = greeks(spots, 1.0, 0.5 - t, 0.04, 0.01, 0.2)
+            price_err = max(price_err, float(np.max(np.abs(val.value - bs.price))))
+            delta_err = max(delta_err, float(np.max(np.abs(val.delta - bs.delta))))
+        return (
+            "Black-Scholes, flat 20% surface",
+            "backward local-volatility PDE",
+            f"price {price_err:.1e}, delta {delta_err:.1e}",
+            price_err < 1e-4 and delta_err < 1e-3,
+        )
+
+    def heston_grid():
+        from .risk.pricers import HestonGrid
+        from .stochvol import pricing
+        from .stochvol.characteristic import Heston
+
+        h = Heston(0.04, 2.0, 0.04, 0.6, -0.7)
+        grid = HestonGrid.build(h, 1.0, 0.25, 0.04, 0.03, np.array([0.0, 0.15]), v_points=28)
+        spots = np.array([0.85, 1.0, 1.15])
+        worst_p = worst_d = 0.0
+        for i, t in enumerate((0.0, 0.15)):
+            tau = 0.25 - t
+            for v0 in (0.01, 0.04, 0.1):
+                hv = Heston(v0, h.kappa, h.theta, h.sigma, h.rho)
+                val = grid.at(i, spots, np.full(3, v0))
+
+                def direct(s, hv=hv, tau=tau):
+                    return pricing.price(s * np.exp(0.03 * tau), np.ones(3), tau, hv, np.exp(-0.04 * tau), True)
+
+                fd = (direct(spots * 1.0001) - direct(spots * 0.9999)) / (2e-4 * spots)
+                worst_p = max(worst_p, float(np.max(np.abs(val.value - direct(spots)))))
+                worst_d = max(worst_d, float(np.max(np.abs(val.delta - fd))))
+        return (
+            "Day 5 contour integral and its finite-difference delta",
+            "COS grid, bicubic",
+            f"price {worst_p:.1e}, delta {worst_d:.1e}",
+            worst_p < 1e-5 and worst_d < 1e-4,
+        )
+
+    def pnl_explain():
+        from .analytic.generalized import greeks as bsm
+        from .risk.explain import explain
+
+        rng = np.random.default_rng(80)
+        ratios = []
+        for _ in range(500):
+            k, t, sigma = float(rng.uniform(0.85, 1.15)), float(rng.uniform(0.05, 1.0)), float(rng.uniform(0.1, 0.4))
+            ds, dv = float(rng.normal(0, 0.01)), float(rng.normal(0, 0.01))
+            call = bool(rng.random() < 0.5)
+            g = bsm(1.0, k, t, 0.04, 0.01, sigma, call)
+            full = bsm(1.0 + ds, k, t - 1 / 252, 0.04, 0.01, sigma + dv, call).price - g.price
+            e = explain(g, ds, dv, 1 / 252, full)
+            size = abs(float(g.delta) * ds) + abs(float(g.vega) * dv) + abs(float(g.theta) / 252)
+            ratios.append(float(abs(e.unexplained)) / size)
+        median, tail = float(np.median(ratios)), float(np.quantile(ratios, 0.99))
+        return (
+            "full revaluation",
+            "8-term Greek explain, 500 one-day moves of about 1%",
+            f"unexplained: median {100 * median:.2f}%, 99th percentile {100 * tail:.1f}% of first-order P&L",
+            median < 0.005 and tail < 0.1,
+        )
+
     add("Analytic", "Published examples", haug)
     add("Analytic", "Seventeen Greeks vs arbitrary precision", mpmath_greeks)
     add("Analytic", "Black-Scholes PDE from the Greeks", pde)
@@ -957,6 +1043,10 @@ def run_validation(fast: bool = False) -> pd.DataFrame:
     add("Surface", "Price interpolation in time", price_interpolation)
     add("Calibration", "Parameter recovery", calibration_recovery)
     add("Hedging", "Discrete-hedging error vs theory", derman_kamal)
+    add("Hedging", "Gamma P&L of hedging at the wrong volatility", gamma_formula)
+    add("Hedging", "P&L explained by eight Greeks", pnl_explain)
+    add("Hedging", "Local-volatility PDE against Black-Scholes", lv_pde_flat)
+    add("Hedging", "Heston price grid against the contour integral", heston_grid)
 
     return pd.DataFrame([c.__dict__ for c in checks])
 
