@@ -163,6 +163,19 @@ def cmd_chains(args: argparse.Namespace) -> None:
         print(f"{day}  {ticker:<6} spot {chain.spot:>10,.2f}  {expiries:>3} expiries  {quotes:>6,} quotes")
 
 
+def cmd_history(args: argparse.Namespace) -> None:
+    from .risk import history
+
+    if args.action == "fetch":
+        print(f"stored {history.fetch()}")
+        return
+    if not history.available():
+        print(f"no history under {history.history_root()}; run `volsurf history fetch`")
+        return
+    frame = history.load()
+    print(f"{len(frame):,} days from {frame.index[0].date()} to {frame.index[-1].date()} under {history.history_root()}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="volsurf", description="Option pricing, volatility surfaces and Heston calibration.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -222,6 +235,10 @@ def build_parser() -> argparse.ArgumentParser:
     snapshot.add_argument("action", choices=["fetch", "list"])
     snapshot.add_argument("tickers", nargs="*", default=["^SPX", "SPY", "AAPL"])
     snapshot.set_defaults(func=cmd_chains)
+
+    past = sub.add_parser("history", help="store S&P 500, VIX and bill-rate history from Yahoo Finance, or describe it")
+    past.add_argument("action", choices=["fetch", "list"])
+    past.set_defaults(func=cmd_history)
     return parser
 
 
