@@ -13,6 +13,8 @@ import numpy as np
 from matplotlib.figure import Figure
 from numpy.typing import NDArray
 
+from ..legacy.surface import VolSurface
+from ..legacy.svi import SVISlice, fit_svi_slice
 from ..market import chains
 from ..market.cleaning import prepare
 from ..smile.build import SurfaceFit, build_surface, inside_spread
@@ -20,8 +22,6 @@ from ..smile.density import density, moments
 from ..smile.fit import fit_slice
 from ..smile.ssvi import Quotes, fit_essvi
 from ..smile.svi import RawSVI, butterfly_check, calendar_check
-from ..surface import VolSurface
-from ..svi import SVISlice, fit_svi_slice
 from .style import PALETTE, SERIES, caption, new_figure, tidy, title_block
 
 Array = NDArray[np.float64]
