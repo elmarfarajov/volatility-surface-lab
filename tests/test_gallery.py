@@ -59,13 +59,15 @@ def test_the_cli_prints_seventeen_greeks(capsys):
     assert len([line for line in out.splitlines() if line.startswith("  ")]) == 17
 
 
-def test_gallery_files_never_overwrite_the_pipeline_figures():
-    # Day 4 once wrote its density chart over the README's pipeline figure of the same name
+def test_gallery_files_never_overwrite_the_report_figures_shown_in_the_readme():
+    # Day 4 once wrote its density chart over the README's pipeline figure of the same name; the
+    # report's figures are copied into docs/images as report-<name>.png, a prefix the gallery never uses
     import re
     from pathlib import Path
 
-    import volsurf.report
+    import volsurf.platform.figures
 
-    source = Path(volsurf.report.__file__).read_text(encoding="utf-8")
-    pipeline = set(re.findall(r'fig_dir / "([\w-]+\.png)"', source))
-    assert pipeline and not pipeline & {item.filename for item in gallery.items()}
+    source = Path(volsurf.platform.figures.__file__).read_text(encoding="utf-8")
+    report = set(re.findall(r'^        "([\w-]+)": \w+\(a\),$', source, flags=re.M))
+    assert {"smiles", "book", "hedging"} <= report
+    assert not any(item.filename.startswith("report-") for item in gallery.items())

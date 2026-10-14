@@ -43,3 +43,29 @@ jobs:
         run: pytest -q --cov=volsurf --cov-report=term-missing
       - name: Numerical validation suite
         run: volsurf validate --fast
+
+  package:
+    # the wheel on its own, in a clean environment without the dev extras: it must install, run and reproduce
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build twine
+      - run: python -m build
+      - run: twine check dist/*
+      - name: Install the wheel alone and run the platform from it
+        run: |
+          python -m venv /tmp/wheel
+          /tmp/wheel/bin/pip install dist/*.whl
+          cd /tmp
+          /tmp/wheel/bin/python -c "import pathlib, volsurf; assert (pathlib.Path(volsurf.__file__).parent / 'py.typed').exists()"
+          /tmp/wheel/bin/volsurf price --spot 100 --strike 100 --maturity 1 --rate 0.05 --vol 0.2
+          /tmp/wheel/bin/volsurf demo --quick --out /tmp/demo
+          /tmp/wheel/bin/volsurf reproduce /tmp/demo
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
