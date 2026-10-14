@@ -1,83 +1,112 @@
 """Command-line interface.
 
-volsurf analyze --ticker ^SPX --expiries 8 --out reports/SPX
-volsurf demo --out reports/demo
-volsurf validate --out docs/VALIDATION.md
+volsurf chains fetch ^SPX                      store today's option chain
+volsurf analyze --ticker ^SPX --out reports/SPX analyse a stored snapshot into a report and manifest
+volsurf reproduce reports/SPX                  rerun it and compare every number
+volsurf demo --out reports/demo                the same analysis on a synthetic Heston chain, offline
 volsurf price --spot 100 --strike 100 --maturity 1 --rate 0.05 --vol 0.2 --heston 0.04,2,0.04,0.5,-0.7
+volsurf validate --out docs/VALIDATION.md
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
-import pandas as pd
 
-from .black_scholes import bsm_price
-from .heston import HestonParams, heston_price_cos_spot, heston_price_integration
-from .lattice import binomial_price
-from .market_data import build_snapshot, fetch_yfinance_chain, synthetic_chain
-from .monte_carlo import lsm_american_price, mc_european_gbm, mc_european_heston
-from .pipeline import AnalysisConfig, run_analysis
-from .report import write_report
 from .validation import run_validation, to_markdown
 
-DEMO_PARAMS = HestonParams(v0=0.028, kappa=2.5, theta=0.042, sigma=0.8, rho=-0.74)
+if TYPE_CHECKING:
+    from .platform.analysis import Config
+    from .platform.sources import Source
 
 
-def _config(args: argparse.Namespace) -> AnalysisConfig:
-    return AnalysisConfig(
-        calibration_method=args.calibration,
-        run_hedging=not args.no_hedging,
-        heston_hedge_paths=args.paths,
-    )
+def _config(args: argparse.Namespace) -> Config:
+    from .platform.analysis import Config
+
+    overrides = {"exotics": not args.no_exotics, "hedging": not args.no_hedging}
+    return Config.fast(**overrides) if args.quick else Config(**overrides)
 
 
-def _finish(snapshot, args: argparse.Namespace) -> None:
-    print(
-        f"Snapshot: {snapshot.ticker} spot {snapshot.spot:,.2f}, {len(snapshot.expiries)} expiries, "
-        f"{sum(len(e.quotes) for e in snapshot.expiries)} clean OTM quotes"
-    )
-    result = run_analysis(snapshot, _config(args))
-    out = Path(args.out)
-    path = write_report(result, out)
-    result.calibration.residuals.to_csv(out / "heston_residuals.csv", index=False)
-    snapshot.term_structure().to_csv(out / "term_structure.csv", index=False)
-    if result.hedging_heston is not None:
-        pd.concat([result.hedging_bs.summary(), result.hedging_heston.summary()]).to_csv(out / "hedging_summary.csv", index=False)
+def _run(source: Source, args: argparse.Namespace) -> None:
+    from .platform import analysis, report
+
+    print(f"Source: {source.describe()}")
+    result = analysis.run(source, _config(args))
+    path = report.write(result, Path(args.out))
     print(f"Report: {path.resolve()}")
+    print(f"Manifest: {(path.parent / 'manifest.json').resolve()}  (volsurf reproduce {args.out})")
 
 
 def cmd_analyze(args: argparse.Namespace) -> None:
-    out = Path(args.out)
-    if args.raw_csv:
-        raw_path = Path(args.raw_csv)
-        meta = json.loads(raw_path.with_suffix(".json").read_text(encoding="utf-8"))
-        raw, spot, as_of = pd.read_csv(raw_path), float(meta["spot"]), datetime.fromisoformat(meta["as_of"])
-        ticker = meta["ticker"]
-        print(f"Replaying saved {ticker} chain from {raw_path} (captured {as_of:%Y-%m-%d %H:%M} UTC)")
-    else:
-        ticker = args.ticker
-        print(f"Downloading {ticker} option chains ...")
-        raw, spot, as_of = fetch_yfinance_chain(ticker, max_expiries=args.expiries)
-        if args.save_raw:
-            out.mkdir(parents=True, exist_ok=True)
-            raw.to_csv(out / "raw_chain.csv", index=False)
-            meta = {"ticker": ticker, "spot": spot, "as_of": as_of.isoformat()}
-            (out / "raw_chain.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    snapshot = build_snapshot(raw, spot, as_of, ticker, "Yahoo Finance (delayed)")
-    _finish(snapshot, args)
+    from .platform.sources import snapshot
+
+    _run(snapshot(args.ticker, args.day), args)
 
 
 def cmd_demo(args: argparse.Namespace) -> None:
-    print(f"Generating a synthetic option market from Heston {DEMO_PARAMS} ...")
-    raw = synthetic_chain(DEMO_PARAMS, seed=args.seed)
-    snapshot = build_snapshot(raw, 5000.0, datetime.now(timezone.utc), "SYNTHETIC", "synthetic Heston market with quote noise")
-    _finish(snapshot, args)
+    from .platform.sources import synthetic
+
+    _run(synthetic(seed=args.seed), args)
+
+
+def cmd_reproduce(args: argparse.Namespace) -> None:
+    from .platform.manifest import reproduce
+
+    comparisons = reproduce(Path(args.directory), rtol=args.rtol)
+    failed = [c for c in comparisons if not c.agrees]
+    for c in failed:
+        print(f"  differs: {c.name}: recorded {c.recorded:.10g}, rerun {c.rerun:.10g}")
+    print(f"{len(comparisons) - len(failed)} of {len(comparisons)} results reproduced to a relative {args.rtol:g}")
+    if failed:
+        sys.exit(1)
+
+
+def cmd_price(args: argparse.Namespace) -> None:
+    from .analytic.generalized import price as bsm
+    from .numerics import lattice, montecarlo, pde
+    from .numerics.lattice import Contract
+    from .stochvol import pricing
+    from .stochvol.characteristic import Heston
+    from .stochvol.simulation import otm_estimate, simulate
+
+    s, k, t, r, q, v = args.spot, args.strike, args.maturity, args.rate, args.dividend, args.vol
+    call = args.type == "call"
+    c = Contract(s, k, t, r, q, v, call)
+    rows: list[tuple[str, float, float | None]] = [
+        ("Black-Scholes-Merton (analytic)", float(bsm(s, k, t, r, q, v, call)), None),
+        ("Leisen-Reimer tree, 301 steps", lattice.price(c, 301).price, None),
+        ("CRR tree, 2000 steps", lattice.price(c, 2000, "crr").price, None),
+        ("Crank-Nicolson PDE after Rannacher steps", pde.solve(c, 800, 800).price, None),
+    ]
+    mc = montecarlo.european(c, 2**17, "sobol", seed=1)
+    rows.append(("Monte Carlo, scrambled Sobol'", mc.price, mc.std_error))
+    rows.append(("American: Leisen-Reimer tree, 1001 steps", lattice.price(c, 1001, exercise="american").price, None))
+    rows.append(("American: Crank-Nicolson PDE", pde.solve(c, 800, 800, exercise="american").price, None))
+    ls = montecarlo.longstaff_schwartz(c, np.linspace(t / 50, t, 50).tolist(), 20_000, 20_000, 500, 100, seed=2)
+    rows.append(("American: Longstaff-Schwartz, lower bound", ls.lower.price, ls.lower.std_error))
+    rows.append(("American: Andersen-Broadie, dual upper bound", ls.upper.price, ls.upper.std_error))
+    if args.heston:
+        h = Heston(*(float(x) for x in args.heston.split(",")))
+        forward, discount = s * np.exp((r - q) * t), float(np.exp(-r * t))
+        rows.append(("Heston: contour integral", float(pricing.price(forward, [k], t, h, discount, call)[0]), None))
+        kk = float(np.log(k / forward))
+        cos = float(pricing.cos_otm_price(np.array([kk]), t, h)[0]) * forward
+        intrinsic = max(forward - k, 0.0) if call else max(k - forward, 0.0)
+        cos += intrinsic if (kk < 0) == call else 0.0
+        rows.append(("Heston: COS", discount * cos, None))
+        paths = simulate(h, t, 100, 100_000, "qe", seed=3)
+        est = otm_estimate(paths, np.array([kk]))
+        value = float(est.value[0]) * forward + (intrinsic if (kk < 0) == call else 0.0)
+        rows.append(("Heston: QE Monte Carlo", discount * value, discount * forward * float(est.stderr[0])))
+    width = max(len(name) for name, _, _ in rows)
+    for name, value, se in rows:
+        extra = f"  +- {se:.4f}" if se is not None else ""
+        print(f"{name:<{width}}  {value:>12.6f}{extra}")
 
 
 def cmd_validate(args: argparse.Namespace) -> None:
@@ -93,32 +122,6 @@ def cmd_validate(args: argparse.Namespace) -> None:
         Path(args.out).write_text(header + table + "\n", encoding="utf-8")
     if not results["passed"].all():
         sys.exit(1)
-
-
-def cmd_price(args: argparse.Namespace) -> None:
-    s, k, t, r, q, v = args.spot, args.strike, args.maturity, args.rate, args.dividend, args.vol
-    is_call = args.type == "call"
-    rows = [
-        ("Black-Scholes (analytic)", float(bsm_price(s, k, t, r, q, v, is_call)), None),
-        ("Leisen-Reimer tree, 301 steps", binomial_price(s, k, t, r, q, v, is_call, steps=301), None),
-        ("CRR tree, 2000 steps", binomial_price(s, k, t, r, q, v, is_call, steps=2000, method="crr"), None),
-    ]
-    mc = mc_european_gbm(s, k, t, r, q, v, is_call, 200_000, seed=1)
-    rows.append(("Monte Carlo + control variate", mc.price, mc.std_error))
-    rows.append(("American: Leisen-Reimer tree", binomial_price(s, k, t, r, q, v, is_call, american=True, steps=1001), None))
-    lsm = lsm_american_price(s, k, t, r, q, v, is_call, 50, 100_000, seed=2)
-    rows.append(("American: Longstaff-Schwartz", lsm.price, lsm.std_error))
-    if args.heston:
-        p = HestonParams.from_array([float(x) for x in args.heston.split(",")])
-        forward = s * np.exp((r - q) * t)
-        rows.append(("Heston: COS", float(heston_price_cos_spot(s, [k], t, r, q, p, is_call)[0]), None))
-        rows.append(("Heston: Gil-Pelaez quadrature", heston_price_integration(forward, k, t, np.exp(-r * t), p, is_call), None))
-        hmc = mc_european_heston(s, k, t, r, q, p, is_call, n_steps=100, n_paths=100_000, seed=3)
-        rows.append(("Heston: QE Monte Carlo", hmc.price, hmc.std_error))
-    width = max(len(name) for name, _, _ in rows)
-    for name, price, se in rows:
-        extra = f"  +- {se:.4f}" if se is not None else ""
-        print(f"{name:<{width}}  {price:>12.6f}{extra}")
 
 
 def cmd_greeks(args: argparse.Namespace) -> None:
@@ -181,23 +184,26 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     def analysis_flags(p: argparse.ArgumentParser, default_out: str) -> None:
-        p.add_argument("--out", default=default_out, help="output directory for report.html, figures and CSVs")
-        p.add_argument("--calibration", choices=["multistart", "global"], default="multistart")
-        p.add_argument("--paths", type=int, default=4000, help="Monte Carlo paths for the Heston hedging lab")
-        p.add_argument("--no-hedging", action="store_true", help="skip the hedging simulation")
+        p.add_argument("--out", default=default_out, help="directory for report.html, figures, tables and manifest.json")
+        p.add_argument("--quick", action="store_true", help="fewer starts and paths: a first look in under a minute")
+        p.add_argument("--no-exotics", action="store_true", help="skip pricing the exotic book under three models")
+        p.add_argument("--no-hedging", action="store_true", help="skip the cross-model hedging simulation")
 
-    analyze = sub.add_parser("analyze", help="full analysis of a live option chain from Yahoo Finance")
+    analyze = sub.add_parser("analyze", help="analyse a stored option-chain snapshot (see `volsurf chains fetch`)")
     analyze.add_argument("--ticker", default="^SPX")
-    analyze.add_argument("--expiries", type=int, default=8)
-    analyze.add_argument("--save-raw", action="store_true", help="also save the raw chain (CSV + JSON metadata) for replay")
-    analyze.add_argument("--raw-csv", default=None, help="replay a chain saved with --save-raw instead of downloading")
-    analysis_flags(analyze, "reports/live")
+    analyze.add_argument("--day", default=None, help="the snapshot's day, YYYY-MM-DD (default: the latest stored)")
+    analysis_flags(analyze, "reports/SPX")
     analyze.set_defaults(func=cmd_analyze)
 
-    demo = sub.add_parser("demo", help="offline analysis of a synthetic Heston market")
+    demo = sub.add_parser("demo", help="the same analysis offline, on a synthetic Heston chain")
     demo.add_argument("--seed", type=int, default=7)
     analysis_flags(demo, "reports/demo")
     demo.set_defaults(func=cmd_demo)
+
+    again = sub.add_parser("reproduce", help="rerun the analysis recorded in a report directory and compare every number")
+    again.add_argument("directory")
+    again.add_argument("--rtol", type=float, default=1e-6)
+    again.set_defaults(func=cmd_reproduce)
 
     validate = sub.add_parser("validate", help="run the numerical validation suite")
     validate.add_argument("--out", default=None, help="write the results as Markdown")
