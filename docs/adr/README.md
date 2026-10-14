@@ -26,3 +26,7 @@
 | [0022](0022-discrete-monitoring-is-priced-on-its-own-grid.md) | Discrete monitoring is priced on its own grid; the continuity correction is checked, not assumed | Accepted |
 | [0023](0023-the-arithmetic-asian-reference-is-controlled-monte-carlo.md) | The arithmetic Asian reference is Monte Carlo with the geometric control, not an analytic engine | Accepted |
 | [0024](0024-exotics-are-priced-under-every-model-of-the-surface.md) | Exotics are priced under every model of the surface, and the spread is reported | Accepted |
+| [0025](0025-hedging-is-measured-by-self-financing-simulation-in-each-model.md) | Hedging is measured by self-financing simulation, in any model's world with any model's hedge | Accepted |
+| [0026](0026-the-minimum-variance-delta-is-the-hedge-ratio.md) | The minimum-variance delta is the hedge ratio, and the smile dynamic behind it is measured | Accepted |
+| [0027](0027-real-data-backtests-state-their-proxies.md) | Real-data backtests state their proxies, are checked against theory, and keep their data local | Accepted |
+| [0028](0028-book-risk-is-full-revaluation-under-stated-smile-dynamics.md) | A book's risk is full revaluation under stated smile dynamics; the Greeks explain, they do not measure | Accepted |
