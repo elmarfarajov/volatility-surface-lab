@@ -1,11 +1,11 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
-title: "Volatility Surface Lab: option pricing, arbitrage-controlled volatility surfaces, Heston calibration and hedging model risk"
+title: "Volatility Surface Lab: arbitrage-free volatility surfaces, Heston, SABR and local volatility, exotics and hedging model risk"
 authors:
   - family-names: Farajov
     given-names: Elmar
-version: 1.8.0
-date-released: 2026-10-14
+version: 1.9.0
+date-released: 2026-10-15
 license: MIT
 repository-code: "https://github.com/elmarfarajov/volatility-surface-lab"
 keywords:

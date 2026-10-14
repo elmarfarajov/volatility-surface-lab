@@ -21,7 +21,7 @@ real market data, or properties that must hold for any input.
 | 6 | Local volatility and SABR: Dupire in implied-volatility form, Hagan and its corrections | #6 | v1.6.0 | ✅ Done |
 | 7 | Exotic options: barriers, Asians, lookbacks and digitals, analytic against simulation | #7 | v1.7.0 | ✅ Done |
 | 8 | Hedging and model risk: Greeks P&L explain, discrete hedging, the book's risk | #8 | v1.8.0 | ✅ Done |
-| 9 | The platform: CLI, dashboard, reproducible reports and packaging | #9 | v1.9.0 | Next |
+| 9 | The platform: CLI, dashboard, reproducible reports and packaging | #9 | v1.9.0 | ✅ Done |
 
 ## Day 1 - the analytic foundation ✅
 
@@ -194,3 +194,36 @@ real market data, or properties that must hold for any input.
     by full revaluation.
 
 **Notes:** [hedging and model risk](notes/hedging-and-model-risk.md).
+
+## Day 9 - the platform ✅
+
+**Issue #9, release v1.9.0.**
+
+- **One analysis over every rebuilt engine.** `volsurf analyze` takes a stored snapshot
+  through the steps of Days 3 to 8: cleaning, surface, Heston, SABR, local volatility,
+  exotics, hedging and book risk. It writes an HTML report, figures, tables and a manifest.
+  The v1.0 pipeline is retired.
+- **Every number can be got again.** The manifest fingerprints the input by SHA-256 and
+  records the configuration, versions and results. `volsurf reproduce` reruns and compares:
+  52 of 52 numbers on the S&P 500 run.
+- **A dashboard over every engine**, offline by default.
+- **A package that works on its own.** CI installs the wheel without the development extras
+  and runs the platform from it.
+
+**Notes:** [the platform](notes/the-platform.md).
+
+## After the nine days
+
+The rebuild is complete:
+
+- 52 validation checks, all passing;
+- 31 architecture decision records;
+- a methodology note for every day;
+- 52 charts drawn from source;
+- one command from a stored option chain to a reproducible report.
+
+The open problems are where the notes leave them:
+
+- Heston's short-dated skew, the natural next models being Bates and rough Bergomi;
+- a history of option quotes in place of the VIX proxy;
+- transaction costs in hedging.

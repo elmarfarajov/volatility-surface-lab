@@ -4,6 +4,67 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-10-15
+
+Day 9: the platform. One reproducible analysis over every rebuilt engine, its report and
+manifest, a dashboard over every engine, and the wheel tested on its own. The last day of
+the nine-day rebuild.
+
+### Added
+
+- **`volsurf.platform`**:
+  - `analysis`: quotes to surface, Heston, SABR, local volatility, exotics, hedging and a
+    book's risk in one run;
+  - `sources`: stored snapshots and synthetic chains, fingerprinted by SHA-256;
+  - `report`: an HTML report with an interactive surface, eight figures and six tables;
+  - `manifest`: the run's record, and `reproduce`, which reruns it and compares every
+    number.
+- **`volsurf reproduce <dir>`**, and `--quick`, `--no-exotics`, `--no-hedging` and
+  `--day` for `analyze` and `demo`.
+- **`volsurf price`** quotes every rebuilt engine:
+  - analytic, both trees, the PDE and Sobol' Monte Carlo;
+  - for American exercise, the tree, the PDE and the Longstaff-Schwartz lower and dual
+    upper bounds;
+  - Heston by contour integral, COS and QE.
+- **A `package` job in CI**: build, `twine check`, then the wheel installed alone runs
+  `price`, `demo --quick` and `reproduce`. The package ships `py.typed`.
+- **A validation row:** a rerun of the platform reproduces every number, and recovers
+  the synthetic chain's Heston model.
+- **A methodology note and ADRs 0029 to 0031.**
+
+### Changed
+
+- **`volsurf analyze` reads a stored snapshot** (`volsurf chains fetch`) instead of
+  downloading. The `--raw-csv` and `--save-raw` flags are removed; fingerprinted
+  snapshots replace them.
+- **`volsurf demo` runs the same v2 analysis** on a synthetic Heston chain.
+- **The dashboard is rebuilt over the v2 engines**, with six tabs (pricer, surface, models,
+  exotics, hedging, risk). It reads stored snapshots and never downloads on its own.
+- **The README's results come from the platform's run** on the 9 October 2026 snapshot,
+  replacing the v1.0 figures.
+- **Strict mypy now covers `volsurf.platform` and the command line.**
+- **The gallery imports its chart modules lazily**, so the report needs no development
+  extras.
+
+### Removed
+
+- **The v1.0 `pipeline`, `report`, `figures`, `calibration` and `hedging` modules**, their
+  tests, the figures they drew for the README, and the v1 calibration validation row.
+  Day 5's recovery row covers that check, and the Derman-Kamal row now uses
+  `volsurf.risk`.
+
+### Moved
+
+- **The v1.0 `svi` and `surface` modules to `volsurf.legacy`.** They are kept only to
+  reproduce the arbitrage Day 4 found in them.
+
+### Found
+
+- **The report could not run from an installed wheel without QuantLib.** It reached the
+  gallery's house style, and with it every gallery module's top-level imports. The
+  wheel-only CI job caught it.
+- **The full S&P 500 analysis reproduces all 52 of its numbers** from its manifest.
+
 ## [1.8.0] - 2026-10-14
 
 Day 8: hedging and model risk. Hedging measured in each model's world with each model's
