@@ -196,3 +196,33 @@ Every chart is rebuilt from source with `volsurf gallery`. The figures of the li
 
 ![One surface, three models, three prices](images/exotic-model-risk.png)
 
+## Day 8: Hedging and model risk
+
+**Hedging in Black-Scholes' world, more and more often** - Delta hedging against Derman and Kamal's law, and delta-gamma hedging with a second option.
+
+![Hedging in Black-Scholes' world, more and more often](images/hedging-frequency.png)
+
+**Hedging at the wrong volatility** - The hedged P&L path by path against the gamma formula, and against realised volatility.
+
+![Hedging at the wrong volatility](images/wrong-volatility.png)
+
+**In Heston's world a delta hedge stops improving** - Black-Scholes, Heston and minimum-variance deltas, and a delta-vega hedge, against rebalancing frequency.
+
+![In Heston's world a delta hedge stops improving](images/heston-hedging.png)
+
+**Hedging the S&P 500 with the wrong model** - A three-month call sold at the market and hedged daily in Heston and local-volatility worlds with each model's delta.
+
+![Hedging the S&P 500 with the wrong model](images/hedging-across-models.png)
+
+**Thirty-six years of selling S&P 500 straddles at the VIX** - Daily-hedged short straddles from 1990: the P&L, the gamma formula on real paths, and the losses.
+
+![Thirty-six years of selling S&P 500 straddles at the VIX](images/variance-premium.png)
+
+**How the S&P 500's volatility moves with the index** - The VIX against index returns, the market's smile dynamic, and the minimum-variance delta on real data.
+
+![How the S&P 500's volatility moves with the index](images/spot-vol-dynamics.png)
+
+**An options book's risk under each smile dynamic** - A dealer's S&P 500 book: stress ladder, historical value at risk, and what the Greeks leave unexplained.
+
+![An options book's risk under each smile dynamic](images/book-risk.png)
+

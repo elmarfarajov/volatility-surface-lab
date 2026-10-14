@@ -20,8 +20,8 @@ real market data, or properties that must hold for any input.
 | 5 | Heston: characteristic functions, Fourier pricing, calibration and simulation | #5 | v1.5.0 | ✅ Done |
 | 6 | Local volatility and SABR: Dupire in implied-volatility form, Hagan and its corrections | #6 | v1.6.0 | ✅ Done |
 | 7 | Exotic options: barriers, Asians, lookbacks and digitals, analytic against simulation | #7 | v1.7.0 | ✅ Done |
-| 8 | Hedging and model risk: Greeks P&L explain, discrete hedging, the book's risk | #8 | v1.8.0 | Next |
-| 9 | The platform: CLI, dashboard, reproducible reports and packaging | #9 | v1.9.0 | |
+| 8 | Hedging and model risk: Greeks P&L explain, discrete hedging, the book's risk | #8 | v1.8.0 | ✅ Done |
+| 9 | The platform: CLI, dashboard, reproducible reports and packaging | #9 | v1.9.0 | Next |
 
 ## Day 1 - the analytic foundation ✅
 
@@ -171,3 +171,26 @@ real market data, or properties that must hold for any input.
   at-the-money call to 0.2% and price a 120% up-and-out call 35% apart.
 
 **Notes:** [exotic options](notes/exotic-options.md).
+
+## Day 8 - hedging and model risk ✅
+
+**Issue #8, release v1.8.0.**
+
+- **Hedging in every model's world with every model's hedge.** One self-financing account
+  is used throughout. Heston Greeks come from a COS grid and local-volatility Greeks from a
+  backward Dupire PDE, and both are held to references. Derman and Kamal are reproduced to
+  the third digit.
+- **Model risk on the S&P 500.** Fitted to one surface, the models give a three-month call
+  deltas from 0.41 to 0.73. Daily-hedged errors are 10% to 17% of the premium in a
+  local-volatility world and 56% to 69% in the calibrated Heston world.
+- **Thirty-six years of data.** Daily-hedged short straddles sold at the VIX made money 85%
+  of the time; the gamma formula explains each trade. The market's smile dynamic is 1.8
+  times sticky strike, and the minimum-variance delta removes 40% of hedging-error
+  variance.
+- **An options book's risk.**
+  - **Stress:** a 10% fall costs $2.0m to $7.6m depending on the smile dynamic.
+  - **Explain:** eight Greeks explain quiet days.
+  - **Crashes:** second-order Greeks misstate them in both directions, so risk is measured
+    by full revaluation.
+
+**Notes:** [hedging and model risk](notes/hedging-and-model-risk.md).

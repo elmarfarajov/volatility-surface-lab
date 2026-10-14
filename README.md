@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)
 ![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
-[![Release](https://img.shields.io/badge/release-v1.7.0-e0632b)](https://github.com/elmarfarajov/volatility-surface-lab/releases)
+[![Release](https://img.shields.io/badge/release-v1.8.0-e0632b)](https://github.com/elmarfarajov/volatility-surface-lab/releases)
 ![mypy](https://img.shields.io/badge/mypy-strict-1b9e77)
 ![Validated](https://img.shields.io/badge/validated-QuantLib%20%7C%20mpmath%20%7C%20Haug-2f6fdb)
 
@@ -39,6 +39,7 @@ the charts in the [gallery](docs/GALLERY.md), and the decisions in the
 | 5 | Heston: prices to the last digit, identifiable calibration, QE simulation | ✅ v1.5.0 |
 | 6 | Local volatility and SABR: closed-form Dupire, Hagan against the model, smile dynamics | ✅ v1.6.0 |
 | 7 | Exotic options: closed forms against QuantLib, corrected Monte Carlo, three models of one surface | ✅ v1.7.0 |
+| 8 | Hedging and model risk: every model's hedge in every model's world, 36 years of data, a book's risk | ✅ v1.8.0 |
 | 7 | Exotic options | next |
 | 8 | Hedging and model risk | |
 | 9 | The platform | |
@@ -163,6 +164,22 @@ The full account is in [local volatility and SABR](docs/notes/local-volatility-a
 
 The full account is in [exotic options](docs/notes/exotic-options.md).
 
+**Day 8: hedging and model risk.**
+
+- **Model risk as a hedging error.** Fitted to the same S&P 500 surface, the models give a
+  three-month call deltas from 0.41 to 0.73. Hedged daily, the error is 10% of the premium
+  in a local-volatility world and at least 56% in the calibrated Heston world.
+- **Thirty-six years of the VIX.** Delta-hedged short straddles made money 85% of the time,
+  and the gamma formula explains each trade. The smile moves 1.8 times as far as sticky
+  strike, and the minimum-variance delta that follows removes 40% of hedging-error
+  variance.
+- **A book's risk.** The smile dynamic changes a 10% stress from $2.0m to $7.6m. Eight
+  Greeks explain quiet days, but they misstate crashes in both directions.
+
+![Thirty-six years of selling S&P 500 straddles at the VIX](docs/images/variance-premium.png)
+
+The full account is in [hedging and model risk](docs/notes/hedging-and-model-risk.md).
+
 ## Results on live S&P 500 options
 
 Snapshot: `^SPX`, Yahoo Finance (delayed), 16 September 2026, spot 7,611.77, **10 expiries from one week to one
@@ -250,6 +267,7 @@ flowchart LR
 | `smile/` | SVI in three parameterisations with whole-line arbitrage checks; SSVI and eSSVI; raw SVI under hard constraints; price interpolation in time; risk-neutral densities |
 | `stochvol/` | Heston: the characteristic function and its moment strip; out-of-the-money prices by contour integral; calibration with identifiability diagnostics; Euler and QE simulation |
 | `localvol/` | Dupire local volatility in closed form and the forward equation that checks it; SABR with an exact reference; smile dynamics and deltas |
+| `risk/` | Self-financing hedging in any model's world; Heston and local-volatility Greeks along paths; minimum-variance deltas; S&P 500 and VIX backtests; P&L explain, stress and historical VaR of a book |
 | `exotics/` | Barrier, Asian, lookback and digital closed forms; Monte Carlo under Black-Scholes, Heston and local volatility with the Brownian bridge, BGK and control variates; exotic model risk |
 | `implied_vol.py` | The original modules' entry points to the implied-volatility inversion in `market/` |
 | `lattice.py` | Leisen-Reimer and Cox-Ross-Rubinstein trees, European and American exercise |
@@ -260,7 +278,7 @@ flowchart LR
 | `surface.py` | Monotone total-variance interpolation, Dupire local volatility, calendar diagnostics |
 | `calibration.py` | Vega-scaled least squares, market-informed multistart or differential evolution, exact-IV residual reporting |
 | `hedging.py` | Discrete delta-hedging P&L in Black-Scholes and Heston worlds for three hedge ratios |
-| `validation.py` | 48 checks against published benchmarks and independent methods |
+| `validation.py` | 52 checks against published benchmarks and independent methods |
 | `report.py`, `figures.py` | Self-contained HTML report with an interactive 3D surface; publication-style figures |
 | `gallery/` | The documentation's charts, registered by day and redrawn with `volsurf gallery` |
 | `app/streamlit_app.py` | Interactive dashboard: pricing lab, surface explorer, calibration and hedging lab |

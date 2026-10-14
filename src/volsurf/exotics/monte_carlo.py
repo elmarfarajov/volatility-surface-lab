@@ -63,11 +63,19 @@ def black_scholes_paths(s: float, t: float, r: float, b: float, sigma: float, st
 
 def heston_paths(s: float, t: float, r: float, b: float, h: Heston, steps: int, paths: int, seed: int = 1) -> Array:
     """Spot at ``steps`` dates under Heston, by QE with Andersen's martingale correction."""
+    return heston_paths_with_variance(s, t, b, h, steps, paths, seed)[0]
+
+
+def heston_paths_with_variance(
+    s: float, t: float, b: float, h: Heston, steps: int, paths: int, seed: int = 1
+) -> tuple[Array, Array]:
+    """Spot and variance at ``steps`` dates under Heston (QE, martingale-corrected); the same draws as :func:`heston_paths`."""
     rng = np.random.default_rng(seed)
     dt = t / steps
     x = np.zeros(paths)
     v = np.full(paths, h.v0)
     out = np.empty((paths, steps))
+    variance = np.empty((paths, steps))
     k1 = 0.5 * dt * (h.kappa * h.rho / h.sigma - 0.5) - h.rho / h.sigma
     k2 = 0.5 * dt * (h.kappa * h.rho / h.sigma - 0.5) + h.rho / h.sigma
     k3 = k4 = 0.5 * dt * (1.0 - h.rho**2)
@@ -81,8 +89,9 @@ def heston_paths(s: float, t: float, r: float, b: float, h: Heston, steps: int, 
         x = x + k0 + k1 * v + k2 * v_new + np.sqrt(np.maximum(k3 * v + k4 * v_new, 0.0)) * rng.standard_normal(paths)
         v = v_new
         out[:, j] = x
+        variance[:, j] = v
     forward = s * np.exp(b * dt * np.arange(1, steps + 1))
-    return np.asarray(forward[None, :] * np.exp(out), dtype=np.float64)
+    return np.asarray(forward[None, :] * np.exp(out), dtype=np.float64), variance
 
 
 def local_vol_paths(s: float, t: float, r: float, b: float, surface: Surface, steps: int, paths: int, seed: int = 1) -> Array:

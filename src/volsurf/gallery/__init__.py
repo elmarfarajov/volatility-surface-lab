@@ -13,7 +13,8 @@ from pathlib import Path
 
 from matplotlib.figure import Figure
 
-from . import analytic, exotics, heston, localvol, market, numerics, smiles
+from ..risk import history
+from . import analytic, exotics, hedging, heston, localvol, market, numerics, smiles
 from .style import save
 
 DAYS: dict[int, str] = {
@@ -24,6 +25,7 @@ DAYS: dict[int, str] = {
     5: "Heston",
     6: "Local volatility and SABR",
     7: "Exotic options",
+    8: "Hedging and model risk",
 }
 
 
@@ -34,10 +36,13 @@ class Item:
     description: str
     build: Callable[[], Figure]
     day: int
-    requires: str | None = None  # "snapshot": drawn from a local option-chain snapshot (``volsurf chains fetch``)
+    # "snapshot": drawn from a local option-chain snapshot (``volsurf chains fetch``); "history": from the
+    # local S&P 500 and VIX history (``volsurf history fetch``); "snapshot+history": both
+    requires: str | None = None
 
     def available(self) -> bool:
-        return self.requires is None or market.snapshot_available()
+        needs = set((self.requires or "").split("+")) - {""}
+        return ("snapshot" not in needs or market.snapshot_available()) and ("history" not in needs or history.available())
 
 
 def items() -> tuple[Item, ...]:
@@ -376,6 +381,60 @@ def items() -> tuple[Item, ...]:
             7,
             "snapshot",
         ),
+        Item(
+            "hedging-frequency.png",
+            "Hedging in Black-Scholes' world, more and more often",
+            "Delta hedging against Derman and Kamal's law, and delta-gamma hedging with a second option.",
+            hedging.hedging_frequency,
+            8,
+        ),
+        Item(
+            "wrong-volatility.png",
+            "Hedging at the wrong volatility",
+            "The hedged P&L path by path against the gamma formula, and against realised volatility.",
+            hedging.wrong_volatility,
+            8,
+        ),
+        Item(
+            "heston-hedging.png",
+            "In Heston's world a delta hedge stops improving",
+            "Black-Scholes, Heston and minimum-variance deltas, and a delta-vega hedge, against rebalancing frequency.",
+            hedging.heston_hedging,
+            8,
+        ),
+        Item(
+            "hedging-across-models.png",
+            "Hedging the S&P 500 with the wrong model",
+            "A three-month call sold at the market and hedged daily in Heston and local-volatility "
+            "worlds with each model's delta.",
+            hedging.hedging_across_models,
+            8,
+            "snapshot",
+        ),
+        Item(
+            "variance-premium.png",
+            "Thirty-six years of selling S&P 500 straddles at the VIX",
+            "Daily-hedged short straddles from 1990: the P&L, the gamma formula on real paths, and the losses.",
+            hedging.variance_premium,
+            8,
+            "history",
+        ),
+        Item(
+            "spot-vol-dynamics.png",
+            "How the S&P 500's volatility moves with the index",
+            "The VIX against index returns, the market's smile dynamic, and the minimum-variance delta on real data.",
+            hedging.spot_vol_dynamics,
+            8,
+            "snapshot+history",
+        ),
+        Item(
+            "book-risk.png",
+            "An options book's risk under each smile dynamic",
+            "A dealer's S&P 500 book: stress ladder, historical value at risk, and what the Greeks leave unexplained.",
+            hedging.book_risk,
+            8,
+            "snapshot+history",
+        ),
     )
 
 
@@ -386,7 +445,7 @@ def build(out_dir: str | Path = "docs/images", only: str | None = None) -> list[
         if only and only not in (item.filename, str(item.day)):
             continue
         if not item.available():
-            print(f"skipped {item.filename}: needs a local option-chain snapshot (volsurf chains fetch ^SPX SPY AAPL)")
+            print(f"skipped {item.filename}: needs local data ({item.requires}; volsurf chains fetch, volsurf history fetch)")
             continue
         written.append(save(item.build(), Path(out_dir) / item.filename))
     return written
