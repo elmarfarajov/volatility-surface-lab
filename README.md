@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/elmarfarajov/volatility-surface-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/elmarfarajov/volatility-surface-lab/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)
-![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-86%25-green)
 ![License](https://img.shields.io/badge/license-MIT-green)
 [![Release](https://img.shields.io/badge/release-v1.9.0-e0632b)](https://github.com/elmarfarajov/volatility-surface-lab/releases)
 ![mypy](https://img.shields.io/badge/mypy-strict-1b9e77)
